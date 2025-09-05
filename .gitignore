@@ -1,0 +1,70 @@
+.env 
+hlpr.db
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+documents/
+env/
+venv/
+ENV/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+coverage.*
+htmlcov/
+
+# Type checking cache
+.mypy_cache/
+.ruff_cache/
+
+# Python package metadata
+pip-wheel-metadata/
+__pypackages__/
+
+# Artifact and log files
+*.log
+pip-selfcheck.json
+
+# DSPy artifacts and optimization results
+artifacts/
+test_artifacts/
+
+# UV lock artifacts (if generated)
+uv.lock
+
+# Jupyter
+*.ipynb_checkpoints/
+
+# Editors / IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache/
+
+# Migrations (if generated later) - uncomment when using Alembic
+# alembic.ini
+# migrations/
+
+# Local data / temp
+tmp/
+*.tmp
+
+# Coverage XML / reports
+coverage.xml
+test-results/
+
+
