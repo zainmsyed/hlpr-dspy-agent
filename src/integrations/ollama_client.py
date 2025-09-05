@@ -129,7 +129,7 @@ class OllamaClient:
         Returns the concatenated text from known keys ('response','text','result') or
         an empty string if nothing useful found.
         """
-        lines = [l.strip() for l in raw.splitlines() if l.strip()]
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
         parts: list[str] = []
         for line in lines:
             try:
