@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     openrouter_api_key: Optional[str] = None
     provider_timeout: float = 10.0
     enable_training: bool = False
+    # Ollama configuration
+    ollama_base_url: Optional[str] = None  # e.g. "http://192.168.86.31:11434"
+    ollama_model: Optional[str] = None
 
     class Config:
         env_file = ".env"

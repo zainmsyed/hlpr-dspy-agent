@@ -150,6 +150,54 @@ class OllamaClient:
                         break
         return "\n".join(parts).strip()
 
+    def get_dspy_lm(self):
+        """Return a DSPy language model instance for Ollama integration."""
+        try:
+            import dspy
+            from dspy.clients.lm import LM
+            class OllamaLM(LM):
+                """A thin LM adapter that delegates generation to OllamaClient.
+
+                Important: DSPy expects LM objects to expose a `model` attribute and
+                to be callable (returning a list of text chunks). We ensure the
+                adapter is initialized with the client's configured model name.
+                """
+
+                def __init__(self, ollama_client: "OllamaClient"):
+                    # initialize the LM base with the model name from the client
+                    model_name = getattr(ollama_client, "model", None) or "unknown"
+                    super().__init__(model=model_name)
+                    # also ensure attribute exists on the instance
+                    self.model = model_name
+                    self.ollama = ollama_client
+
+                def __call__(self, prompt: str, **kwargs):
+                    """Call OllamaClient.predict and return a list of text results.
+
+                    We return a list of strings to match DSPy's expectation for
+                    streaming/segmented outputs.
+                    """
+                    try:
+                        resp = self.ollama.predict(prompt, **kwargs)
+                        if isinstance(resp, dict):
+                            return [resp.get("result", "")]
+                        return [str(resp)]
+                    except Exception as e:
+                        # Return a safe single-item list on error so DSPy callers
+                        # don't crash; include the error text for debugging.
+                        return [f"[DSPy-Ollama Error]: {str(e)}"]
+
+                def get_generate_kwargs(self, **kwargs):
+                    """Normalize generation kwargs for DSPy callers."""
+                    return {
+                        "temperature": kwargs.get("temperature", 0.0),
+                        "max_tokens": kwargs.get("max_tokens", 150),
+                    }
+
+            return OllamaLM(self)
+        except ImportError:
+            raise ImportError("DSPy is required for DSPy integration. Install with: pip install dspy-ai")
+
     def health_check(self) -> bool:
         """Quick health check against common endpoints. Returns True if service responds."""
         endpoints = ["/api/system", "/api/models", "/"]
@@ -158,7 +206,13 @@ class OllamaClient:
             try:
                 req = _request.Request(url, method="GET")
                 with _request.urlopen(req, timeout=self.timeout) as resp:
-                    if resp.status == 200:
+                    # Some servers return 200, others may return 204 etc.; treat 2xx as healthy
+                    status = getattr(resp, "status", None)
+                    if status is None:
+                        # older urllib may not expose .status; assume success if read works
+                        _ = resp.read()
+                        return True
+                    if 200 <= int(status) < 300:
                         return True
             except Exception:
                 continue
