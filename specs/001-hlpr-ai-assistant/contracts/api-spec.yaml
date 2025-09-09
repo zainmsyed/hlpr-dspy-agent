@@ -1,0 +1,570 @@
+openapi: 3.0.3
+info:
+  title: hlpr AI Assistant API
+  description: Personal AI assistant for document summarization, meeting processing, and email classification
+  version: 0.1.0
+  contact:
+    name: hlpr Development Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /summarize/document:
+    post:
+      summary: Summarize a document
+      description: Process and summarize a document (PDF, DOCX, TXT, MD)
+      operationId: summarizeDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file to summarize
+                provider_id:
+                  type: string
+                  description: AI provider to use (optional, uses default)
+                  example: "local"
+                save_format:
+                  type: string
+                  enum: [txt, md, json]
+                  description: Output format for saved summary
+                  default: json
+              required:
+                - file
+          application/json:
+            schema:
+              type: object
+              properties:
+                text_content:
+                  type: string
+                  description: Raw text content to summarize
+                title:
+                  type: string
+                  description: Document title
+                provider_id:
+                  type: string
+                  description: AI provider to use (optional)
+                save_format:
+                  type: string
+                  enum: [txt, md, json]
+                  default: json
+              required:
+                - text_content
+      responses:
+        '200':
+          description: Document successfully summarized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSummaryResponse'
+        '400':
+          description: Invalid request (unsupported format, file too large, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Processing error (file corrupted, LLM unavailable, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /summarize/meeting:
+    post:
+      summary: Process meeting notes
+      description: Extract structured information from meeting notes or transcripts
+      operationId: processMeeting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  description: Meeting notes or transcript text
+                title:
+                  type: string
+                  description: Meeting title
+                date:
+                  type: string
+                  format: date-time
+                  description: Meeting date (ISO 8601)
+                provider_id:
+                  type: string
+                  description: AI provider to use (optional)
+              required:
+                - content
+      responses:
+        '200':
+          description: Meeting notes successfully processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingSummaryResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /email/process:
+    post:
+      summary: Process emails from configured account
+      description: Fetch, classify, and summarize emails from an IMAP account
+      operationId: processEmails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account_id:
+                  type: string
+                  description: Email account identifier
+                mailbox:
+                  type: string
+                  description: Mailbox/folder name
+                  default: "INBOX"
+                filters:
+                  type: object
+                  properties:
+                    unread_only:
+                      type: boolean
+                      default: true
+                    since_date:
+                      type: string
+                      format: date
+                      description: Only process emails after this date
+                    from_sender:
+                      type: string
+                      description: Filter by sender email
+                    limit:
+                      type: integer
+                      minimum: 1
+                      maximum: 1000
+                      default: 50
+                      description: Maximum number of emails to process
+                provider_id:
+                  type: string
+                  description: AI provider for classification/summarization
+              required:
+                - account_id
+      responses:
+        '200':
+          description: Emails successfully processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailProcessResponse'
+        '400':
+          description: Invalid request or account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Email authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /email/accounts:
+    get:
+      summary: List configured email accounts
+      description: Get list of configured email accounts (without credentials)
+      operationId: listEmailAccounts
+      responses:
+        '200':
+          description: List of email accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmailAccountSummary'
+
+    post:
+      summary: Add email account configuration
+      description: Configure a new email account for processing
+      operationId: addEmailAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailAccountConfig'
+      responses:
+        '201':
+          description: Email account successfully configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailAccountSummary'
+        '400':
+          description: Invalid configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Account ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /providers:
+    get:
+      summary: List AI providers
+      description: Get list of configured AI providers
+      operationId: listProviders
+      responses:
+        '200':
+          description: List of AI providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AIProviderSummary'
+
+  /jobs/{job_id}:
+    get:
+      summary: Get job status
+      description: Check the status of a background processing job
+      operationId: getJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobStatus'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    DocumentSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        summary:
+          type: string
+          description: Generated summary
+        key_points:
+          type: array
+          items:
+            type: string
+          description: Extracted key points
+        word_count:
+          type: integer
+          description: Original document word count
+        processing_time_ms:
+          type: integer
+          description: Time taken to process
+        provider_used:
+          type: string
+          description: AI provider that generated the summary
+      required:
+        - id
+        - summary
+        - word_count
+        - processing_time_ms
+
+    MeetingSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        overview:
+          type: string
+          description: Meeting overview
+        key_points:
+          type: array
+          items:
+            type: string
+        action_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionItem'
+        participants:
+          type: array
+          items:
+            type: string
+        processing_time_ms:
+          type: integer
+      required:
+        - id
+        - overview
+        - key_points
+
+    ActionItem:
+      type: object
+      properties:
+        description:
+          type: string
+        assignee:
+          type: string
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        priority:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+          default: MEDIUM
+      required:
+        - description
+
+    EmailProcessResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Background job ID for tracking progress
+        account_id:
+          type: string
+        emails_found:
+          type: integer
+          description: Number of emails matching filters
+        status:
+          type: string
+          enum: [STARTED, COMPLETED]
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailSummary'
+          description: Processed emails (if completed synchronously)
+      required:
+        - job_id
+        - account_id
+        - emails_found
+        - status
+
+    EmailSummary:
+      type: object
+      properties:
+        message_id:
+          type: string
+        sender:
+          type: string
+        subject:
+          type: string
+        date:
+          type: string
+          format: date-time
+        classification:
+          type: string
+          enum: [IMPORTANT, WORK, PERSONAL, PROMOTIONAL, NEWSLETTER, SPAM, ACTION_REQUIRED]
+        priority:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        summary:
+          type: string
+        action_items:
+          type: array
+          items:
+            type: string
+      required:
+        - message_id
+        - sender
+        - subject
+        - date
+        - classification
+        - summary
+
+    EmailAccountSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+          enum: [GMAIL, OUTLOOK, CUSTOM]
+        username:
+          type: string
+        host:
+          type: string
+        last_sync:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - provider
+        - username
+        - host
+
+    EmailAccountConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          description: Account identifier
+        provider:
+          type: string
+          enum: [GMAIL, OUTLOOK, CUSTOM]
+        host:
+          type: string
+          description: IMAP server hostname
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 993
+        username:
+          type: string
+          format: email
+        password:
+          type: string
+          description: Password or app password
+        default_mailbox:
+          type: string
+          default: "INBOX"
+        use_tls:
+          type: boolean
+          default: true
+      required:
+        - id
+        - provider
+        - username
+        - password
+
+    AIProviderSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [LOCAL, OPENAI, ANTHROPIC]
+        model_name:
+          type: string
+        is_default:
+          type: boolean
+        status:
+          type: string
+          enum: [AVAILABLE, UNAVAILABLE, ERROR]
+      required:
+        - id
+        - type
+        - model_name
+        - is_default
+        - status
+
+    ProcessingJobStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [DOCUMENT_SUMMARY, EMAIL_PROCESS, MEETING_ANALYSIS]
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, COMPLETED, FAILED]
+        progress_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        result_data:
+          type: object
+          nullable: true
+          description: Job results (if completed)
+      required:
+        - id
+        - type
+        - status
+        - progress_percent
+        - created_at
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        error_code:
+          type: string
+          description: Machine-readable error code
+        details:
+          type: object
+          nullable: true
+          description: Additional error details
+      required:
+        - error
+        - error_code
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication when exposed beyond localhost
+
+security:
+  - ApiKeyAuth: []
