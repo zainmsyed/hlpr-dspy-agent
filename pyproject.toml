@@ -1,6 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "hlpr"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Personal AI Assistant"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -11,11 +15,15 @@ dependencies = [
     "httpx>=0.28.1",
     "keyring>=25.6.0",
     "pydantic>=2.11.7",
-    "pypdf2>=3.0.1",
+    "pypdf>=4.0.0",
     "python-docx>=1.2.0",
+    "python-multipart>=0.0.6",
     "rich>=14.1.0",
     "typer>=0.17.4",
 ]
+
+[project.scripts]
+hlpr = "hlpr.cli.main:app"
 
 [dependency-groups]
 dev = [
@@ -34,6 +42,8 @@ ignore = ["S101", "PLR2004"]  # Ignore assert and magic values in tests
 "tests/**/*.py" = ["PLR2004", "PLC0415"]  # Allow magic numbers and imports anywhere in tests
 "src/hlpr/document/**/*.py" = ["S101", "PTH123", "S603"]  # Document processing: allow asserts, file paths, subprocess calls
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
+[tool.hatch.version]
+path = "src/hlpr/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hlpr"]

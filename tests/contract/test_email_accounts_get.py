@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from src.hlpr.api.main import app
+from hlpr.api.main import app
 
 client = TestClient(app)
 

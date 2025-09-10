@@ -3,7 +3,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from src.hlpr.cli.main import app
+from hlpr.cli.main import app
 
 runner = CliRunner()
 
