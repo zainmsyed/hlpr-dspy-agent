@@ -32,6 +32,7 @@ ignore = ["S101", "PLR2004"]  # Ignore assert and magic values in tests
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["PLR2004", "PLC0415"]  # Allow magic numbers and imports anywhere in tests
+"src/hlpr/document/**/*.py" = ["S101", "PTH123", "S603"]  # Document processing: allow asserts, file paths, subprocess calls
 
 [tool.ruff.format]
 quote-style = "double"

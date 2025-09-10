@@ -1,0 +1,143 @@
+openapi: 3.0.3
+info:
+  title: hlpr Document Summarization API
+  description: API for document summarization using AI
+  version: 0.1.0
+  contact:
+    name: hlpr Development Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /summarize/document:
+    post:
+      summary: Summarize a document
+      description: Process and summarize a document (PDF, DOCX, TXT, MD)
+      operationId: summarizeDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file to summarize
+                provider_id:
+                  type: string
+                  description: AI provider to use (optional, uses default)
+                format:
+                  type: string
+                  enum: [txt, md, json]
+                  description: Output format (default: json)
+              required:
+                - file
+          application/json:
+            schema:
+              type: object
+              properties:
+                text_content:
+                  type: string
+                  description: Raw text content to summarize
+                title:
+                  type: string
+                  description: Document title
+                provider_id:
+                  type: string
+                  description: AI provider to use (optional)
+                format:
+                  type: string
+                  enum: [txt, md, json]
+                  default: json
+              required:
+                - text_content
+      responses:
+        '200':
+          description: Document successfully summarized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSummaryResponse'
+        '400':
+          description: Invalid request (unsupported format, file too large, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Processing error (file corrupted, LLM unavailable, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    DocumentSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        summary:
+          type: string
+          description: Generated summary
+        key_points:
+          type: array
+          items:
+            type: string
+          description: Extracted key points
+        word_count:
+          type: integer
+          description: Original document word count
+        processing_time_ms:
+          type: integer
+          description: Time taken to process
+        provider_used:
+          type: string
+          description: AI provider that generated the summary
+        format:
+          type: string
+          enum: [txt, md, json]
+      required:
+        - id
+        - summary
+        - word_count
+        - processing_time_ms
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        error_code:
+          type: string
+          description: Machine-readable error code
+        details:
+          type: object
+          nullable: true
+          description: Additional error details
+      required:
+        - error
+        - error_code
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication when exposed beyond localhost
+
+security:
+  - ApiKeyAuth: []
