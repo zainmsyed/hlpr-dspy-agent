@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+import tempfile
 from typing import List, Optional
 from uuid import UUID, uuid4
 import os
@@ -64,16 +65,32 @@ class Document(BaseModel):
         if not path.stat().st_size > 0:
             raise ValueError(f"File is empty: {v}")
 
-        # Prevent path traversal / ensure file is inside workspace
+        # Prevent path traversal / ensure file is inside workspace or system temp directory
         try:
             workspace_root = Path(os.getcwd()).resolve()
             resolved = path.resolve()
-            if not resolved.is_relative_to(workspace_root):
+
+            # Allow files in workspace or system temp directory (cross-platform)
+            is_in_workspace = resolved.is_relative_to(workspace_root)
+            system_temp = Path(tempfile.gettempdir()).resolve()
+            try:
+                resolved.relative_to(system_temp)
+                is_in_temp = True
+            except Exception:
+                is_in_temp = False
+
+            if not (is_in_workspace or is_in_temp):
                 raise ValueError(f"File path is outside of allowed workspace: {v}")
         except AttributeError:
             # For Python versions without is_relative_to, fallback to manual check
             workspace_root = str(Path(os.getcwd()).resolve())
-            if not str(path.resolve()).startswith(workspace_root):
+            resolved_str = str(path.resolve())
+
+            is_in_workspace = resolved_str.startswith(workspace_root)
+            system_temp = str(Path(tempfile.gettempdir()).resolve())
+            is_in_temp = resolved_str.startswith(system_temp)
+
+            if not (is_in_workspace or is_in_temp):
                 raise ValueError(f"File path is outside of allowed workspace: {v}")
 
         return str(path.absolute())

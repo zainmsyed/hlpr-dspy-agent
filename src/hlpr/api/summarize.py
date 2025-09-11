@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 import os
+import shutil
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status, Request
 from fastapi.responses import JSONResponse
@@ -116,19 +117,23 @@ async def summarize_document(
                 )
 
             # Save uploaded file temporarily and ensure robust cleanup
+            temp_dir = None
             temp_file_path = None
             try:
-                # Create temp file inside the workspace to satisfy path validation
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}", dir=os.getcwd()) as temp_file:
-                    content_stream = await file.read()
+                # Create secure temporary directory
+                temp_dir = tempfile.mkdtemp(prefix="hlpr_upload_")
+                temp_file_path = Path(temp_dir) / f"upload_{uuid4().hex}.{extension}"
+
+                # Write uploaded content to secure temp file
+                content_stream = await file.read()
+                with temp_file_path.open("wb") as temp_file:
                     temp_file.write(content_stream)
-                    temp_file_path = temp_file.name
 
                 # Parse document
-                extracted_text = DocumentParser.parse_file(temp_file_path)
+                extracted_text = DocumentParser.parse_file(str(temp_file_path))
 
                 # Create document model
-                document = Document.from_file(temp_file_path)
+                document = Document.from_file(str(temp_file_path))
                 document.extracted_text = extracted_text
 
                 # Initialize summarizer
@@ -156,12 +161,12 @@ async def summarize_document(
                 )
 
             finally:
-                # Clean up temporary file if it was created
+                # Clean up temporary directory securely
                 try:
-                    if temp_file_path:
-                        Path(temp_file_path).unlink(missing_ok=True)
+                    if temp_dir and Path(temp_dir).exists():
+                        shutil.rmtree(temp_dir, ignore_errors=True)
                 except Exception as e:
-                    logger.warning(f"Failed to cleanup temporary file {temp_file_path}: {e}")
+                    logger.warning(f"Failed to cleanup temporary directory {temp_dir}: {e}")
 
         # Otherwise, expect JSON with text_content
         body = await request.json()

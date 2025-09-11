@@ -4,7 +4,18 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from pypdf import PdfReader
+try:
+    # Prefer the PyPDF2 namespace if available for backward compatibility
+    from PyPDF2 import PdfReader  # type: ignore
+except Exception:
+    try:
+        # Newer package name used by many installs
+        from pypdf import PdfReader  # type: ignore
+    except Exception:
+        # Keep a clear name in module namespace; consumers should check and
+        # raise a helpful error when attempting to use PDF parsing.
+        PdfReader = None
+
 from docx import Document as DocxDocument
 
 from hlpr.models.document import Document, FileFormat
@@ -74,8 +85,11 @@ class DocumentParser:
             Extracted text content
 
         Raises:
-            ValueError: If PDF parsing fails
+            ValueError: If PDF parsing fails or PDF library not available
         """
+        if PdfReader is None:
+            raise ValueError("PDF parsing not available - install PyPDF2 or pypdf package")
+
         try:
             reader = PdfReader(file_path)
             text_content = []

@@ -4,16 +4,13 @@ import logging
 import time
 from typing import List, Optional
 
-import dspy
 from pydantic import BaseModel
 
 from hlpr.models.document import Document
+from hlpr.llm.dspy_integration import DSPyDocumentSummarizer, DSPySummaryResult
+from hlpr.document.chunker import Chunker
 
 logger = logging.getLogger(__name__)
-from threading import Lock
-
-# Guard for DSPy configuration to avoid concurrent reconfiguration
-_dspy_config_lock = Lock()
 
 
 class SummaryResult(BaseModel):
@@ -39,6 +36,7 @@ class DocumentSummarizer:
         api_key: Optional[str] = None,
         max_tokens: int = 8192,
         temperature: float = 0.3,
+        timeout: int = 30,
     ):
         """Initialize the document summarizer.
 
@@ -49,6 +47,7 @@ class DocumentSummarizer:
             api_key: API key for cloud providers
             max_tokens: Maximum tokens per request
             temperature: Sampling temperature
+            timeout: Request timeout in seconds
         """
         self.provider = provider
         self.model = model
@@ -56,61 +55,24 @@ class DocumentSummarizer:
         self.api_key = api_key
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.timeout = timeout
 
-        # Initialize DSPy configuration. If configuration fails (no local model),
-        # fall back to a simple rule-based summarizer used for tests and degraded modes.
+        # Initialize DSPy summarizer with fallback handling
         self.use_dspy = True
         try:
-            self._configure_dspy()
-            # Initialize summarization signature
-            self.summarize_signature = self._create_summarize_signature()
+            self.dspy_summarizer = DSPyDocumentSummarizer(
+                provider=provider,
+                model=model,
+                api_base=api_base,
+                api_key=api_key,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+            )
         except Exception as e:
-            # Log and disable DSPy usage; fallback summarizer will be used instead
-            logger.warning(f"DSPy configuration failed, using fallback summarizer: {e}")
+            logger.warning(f"DSPy initialization failed, using fallback: {e}")
             self.use_dspy = False
-            self.summarize_signature = None
-
-    def _configure_dspy(self) -> None:
-        """Configure DSPy with the specified provider."""
-        # Configure LM according to provider inside a lock to prevent
-        # dspys global settings being changed by multiple threads.
-        with _dspy_config_lock:
-            if self.provider == "local":
-                # Configure for local Ollama-compatible API
-                api_base = self.api_base or "http://localhost:11434"
-                lm = dspy.LM(
-                    model=f"ollama/{self.model}",
-                    api_base=api_base,
-                    api_key=self.api_key or "ollama",
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                )
-            elif self.provider == "openai":
-                lm = dspy.LM(
-                    model=f"openai/{self.model}",
-                    api_key=self.api_key,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                )
-            elif self.provider == "anthropic":
-                lm = dspy.LM(
-                    model=f"anthropic/{self.model}",
-                    api_key=self.api_key,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                )
-            else:
-                raise ValueError(f"Unsupported provider: {self.provider}")
-
-            # Use configure guarded by lock
-            dspy.configure(lm=lm)
-
-    def _create_summarize_signature(self) -> dspy.Signature:
-        """Create the DSPy signature for document summarization."""
-        return dspy.Signature(
-            "document_text: str -> summary: str, key_points: list[str]",
-            "Given a document text, generate a concise summary and extract the key points."
-        )
+            self.dspy_summarizer = None
 
     def summarize_document(self, document: Document) -> SummaryResult:
         """Summarize a document using DSPy.
@@ -130,33 +92,17 @@ class DocumentSummarizer:
         start_time = time.time()
 
         # If DSPy isn't available, use a simple fallback summarizer to allow tests
-        if not self.use_dspy:
+        if not self.use_dspy or self.dspy_summarizer is None:
             return self._fallback_summarize(document.extracted_text)
 
         try:
-            # Create DSPy module for summarization
-            summarizer = dspy.Predict(self.summarize_signature)
-
-            # Generate summary
-            result = summarizer(document_text=document.extracted_text)
-
-            # Extract key points (ensure it's a list)
-            key_points = result.key_points
-            if isinstance(key_points, str):
-                # If returned as string, split by newlines or common separators
-                key_points = [point.strip() for point in key_points.split('\n') if point.strip()]
-            elif not isinstance(key_points, list):
-                key_points = [str(key_points)]
-
-            # Filter out empty points
-            key_points = [point for point in key_points if point.strip()]
-
-            processing_time_ms = int((time.time() - start_time) * 1000)
+            # Use DSPy summarizer
+            dspy_result = self.dspy_summarizer.summarize(document.extracted_text)
 
             return SummaryResult(
-                summary=result.summary.strip(),
-                key_points=key_points,
-                processing_time_ms=processing_time_ms,
+                summary=dspy_result.summary,
+                key_points=dspy_result.key_points,
+                processing_time_ms=dspy_result.processing_time_ms,
             )
 
         except Exception as e:
@@ -190,31 +136,17 @@ class DocumentSummarizer:
         start_time = time.time()
 
         # If DSPy is not available, use fallback
-        if not self.use_dspy:
+        if not self.use_dspy or self.dspy_summarizer is None:
             return self._fallback_summarize(text)
 
         try:
-            # Create DSPy module for summarization
-            summarizer = dspy.Predict(self.summarize_signature)
-
-            # Generate summary
-            result = summarizer(document_text=document_text)
-
-            # Extract key points
-            key_points = result.key_points
-            if isinstance(key_points, str):
-                key_points = [point.strip() for point in key_points.split('\n') if point.strip()]
-            elif not isinstance(key_points, list):
-                key_points = [str(key_points)]
-
-            key_points = [point for point in key_points if point.strip()]
-
-            processing_time_ms = int((time.time() - start_time) * 1000)
+            # Use DSPy summarizer
+            dspy_result = self.dspy_summarizer.summarize(document_text)
 
             return SummaryResult(
-                summary=result.summary.strip(),
-                key_points=key_points,
-                processing_time_ms=processing_time_ms,
+                summary=dspy_result.summary,
+                key_points=dspy_result.key_points,
+                processing_time_ms=dspy_result.processing_time_ms,
             )
 
         except Exception as e:
@@ -282,51 +214,9 @@ class DocumentSummarizer:
             raise ValueError(f"Large document summarization failed: {e}")
 
     def _chunk_text(self, text: str, chunk_size: int, overlap: int) -> List[str]:
-        """Split text into chunks with overlap.
-
-        Args:
-            text: Text to chunk
-            chunk_size: Maximum characters per chunk
-            overlap: Characters to overlap
-
-        Returns:
-            List of text chunks
-        """
-        if chunk_size <= overlap:
-            raise ValueError("Chunk size must be greater than overlap")
-
-        chunks = []
-        start = 0
-
-        while start < len(text):
-            end = start + chunk_size
-
-            # If we're not at the end, try to find a good break point
-            if end < len(text):
-                # Look for sentence endings within the last 200 characters
-                break_chars = ['. ', '! ', '? ', '\n\n']
-                best_break = end
-
-                for break_char in break_chars:
-                    last_break = text.rfind(break_char, start, end)
-                    if last_break != -1 and last_break > end - 200:
-                        best_break = last_break + len(break_char)
-                        break
-
-                end = best_break
-
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-
-            # Move start position with overlap
-            start = end - overlap
-
-            # Ensure we make progress
-            if start >= end:
-                start = end
-
-        return chunks
+        """Delegate chunking to the shared Chunker implementation."""
+        c = Chunker(chunk_size=chunk_size, overlap=overlap)
+        return c.chunk_text(text)
 
     def _fallback_summarize(self, text: str) -> SummaryResult:
         """A simple fallback summarizer used when DSPy or model is unavailable.
