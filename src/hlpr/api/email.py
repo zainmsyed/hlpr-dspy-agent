@@ -9,7 +9,7 @@ import re
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -36,7 +36,7 @@ def list_accounts() -> dict[str, list[dict[str, Any]]]:
 
 
 @router.post("/accounts")
-def create_account(payload: dict[str, Any] = Body(...)) -> JSONResponse:
+def create_account(payload: dict[str, Any]) -> JSONResponse:
     """Create an email account with basic validation.
 
     Expected fields (varies by provider): id, provider, host, port?, username, password,
@@ -50,7 +50,9 @@ def create_account(payload: dict[str, Any] = Body(...)) -> JSONResponse:
     host = payload.get("host")
 
     # Validate id format
-    if not acc_id or not isinstance(acc_id, str) or not re.match(r"^[A-Za-z0-9_\-]+$", acc_id):
+    if not acc_id or not isinstance(acc_id, str) or not re.match(
+        r"^[A-Za-z0-9_\-]+$", acc_id,
+    ):
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid or missing id", "error_code": "INVALID_ID"},
@@ -60,7 +62,10 @@ def create_account(payload: dict[str, Any] = Body(...)) -> JSONResponse:
     if acc_id in _accounts:
         return JSONResponse(
             status_code=409,
-            content={"error": "Account with this id already exists", "error_code": "DUPLICATE_ID"},
+            content={
+                "error": "Account with this id already exists",
+                "error_code": "DUPLICATE_ID",
+            },
         )
 
     # Validate provider
@@ -77,7 +82,10 @@ def create_account(payload: dict[str, Any] = Body(...)) -> JSONResponse:
         if not all(required):
             return JSONResponse(
                 status_code=400,
-                content={"error": "Missing required fields", "error_code": "INVALID_CONFIG"},
+                content={
+                    "error": "Missing required fields",
+                    "error_code": "INVALID_CONFIG",
+                },
             )
 
     # Save account (omit sensitive fields from GET)
@@ -104,7 +112,7 @@ def create_account(payload: dict[str, Any] = Body(...)) -> JSONResponse:
 
 
 @router.post("/process")
-def process_emails(payload: dict[str, Any] = Body(...)) -> JSONResponse:
+def process_emails(payload: dict[str, Any]) -> JSONResponse:
     """Start processing emails for a given account and return a job id."""
     account_id = payload.get("account_id")
     if not account_id:

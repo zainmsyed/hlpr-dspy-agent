@@ -32,8 +32,7 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         ),
     ),
         save: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
-            False,
-            "--save",
+            default=False,
             help="Save summary to file",
         ),
     output_format: str = typer.Option(
@@ -64,8 +63,7 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         ),
     ),
     verbose: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
-        False,
-        "--verbose",
+        default=False,
         help="Enable verbose output",
     ),
 ):
@@ -104,104 +102,6 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         if save:
             output_path = _save_summary(document, result, output_format, output)
             console.print(f"\n[green]Summary saved to:[/green] {output_path}")
-
-    except typer.Exit:
-        raise
-    except Exception as e:
-        console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(4) from e
-
-
-@app.command("meeting")
-def summarize_meeting(  # noqa: PLR0913 - multiple options for CLI UX
-    file_path: str = typer.Argument(..., help="Path to meeting notes (txt|md)"),
-    provider: str = typer.Option(
-        "local",
-        "--provider",
-        help="AI provider to use [local|openai|anthropic|groq|together]",
-    ),
-    title: str | None = typer.Option(None, "--title", help="Meeting title"),
-    date: str | None = typer.Option(None, "--date", help="Meeting date (YYYY-MM-DD)"),
-    save: bool = typer.Option(False, "--save", help="Save summary to file"),  # noqa: FBT001
-    output_format: str = typer.Option("rich", "--format", help="[txt|md|json|rich]"),
-    output: str | None = typer.Option(None, "--output", help="Output file path"),
-) -> None:
-    """Summarize meeting notes from a text or markdown file."""
-    path = Path(file_path)
-    if not path.exists() or not path.is_file():
-        console.print(f"[red]Error:[/red] File not found: {file_path}")
-        raise typer.Exit(1)
-
-    if path.suffix.lower() not in {".txt", ".md"}:
-        console.print("[red]Error:[/red] Unsupported file format for meeting notes. Use .txt or .md")
-        raise typer.Exit(2)
-
-    try:
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        # Very lightweight meeting summary heuristic for tests
-        overview = text.split("\n", 1)[0].strip() or "Meeting overview"
-        key_points = []
-        if "action" in text.lower():
-            key_points.append("Identified action items")
-        if "discuss" in text.lower():
-            key_points.append("Discussion points noted")
-        action_items = []
-        for line in text.splitlines():
-            if any(k in line.lower() for k in ["action:", "todo:", "- [ ]", "* [ ]"]):
-                action_items.append(line.strip())
-
-        # Print output
-        if output_format == "json":
-            data = {
-                "title": title or path.stem,
-                "date": date,
-                "provider": provider,
-                "overview": overview,
-                "key_points": key_points,
-                "action_items": action_items,
-            }
-            console.print_json(data=data)
-        elif output_format in {"txt", "md", "rich"}:
-            hdr = f"Meeting: {title or path.stem}"
-            if date:
-                hdr += f" ({date})"
-            console.print(hdr)
-            console.print()
-            console.print("Overview")
-            console.print(overview)
-            console.print()
-            console.print("Key Points")
-            for p in key_points:
-                console.print(f"• {p}")
-            console.print()
-            console.print("Action Items")
-            if action_items:
-                for a in action_items:
-                    console.print(f"- {a}")
-            else:
-                console.print("- None")
-        else:
-            console.print(f"[red]Error:[/red] Unsupported output format: {output_format}")
-            raise typer.Exit(2)
-
-        if save:
-            # Reuse document save helpers by faking minimal objects
-            from types import SimpleNamespace
-
-            result_obj = SimpleNamespace(
-                summary=overview,
-                key_points=key_points,
-                processing_time_ms=0,
-            )
-            fmt_obj = SimpleNamespace(value="txt")
-            doc_obj = SimpleNamespace(
-                path=str(path),
-                size_bytes=len(text.encode("utf-8")),
-                format=fmt_obj,
-            )
-
-            out_path = _save_summary(doc_obj, result_obj, output_format, output)
-            console.print(f"\n[green]Summary saved to:[/green] {out_path}")
 
     except typer.Exit:
         raise
@@ -447,3 +347,70 @@ def _summarize_with_progress(  # noqa: PLR0913
             desc = "Summary generated successfully"
             progress.update(summarize_task, completed=True, description=desc)
             return result
+
+
+def _parse_meeting_file(file_path: str) -> tuple[str, list[str], list[str]]:
+    """Parse meeting file and extract overview, key points, and action items."""
+    path = Path(file_path)
+    text = path.read_text(encoding="utf-8", errors="ignore")
+
+    overview = text.split("\n", 1)[0].strip() or "Meeting overview"
+    key_points = []
+    if "action" in text.lower():
+        key_points.append("Identified action items")
+    if "discuss" in text.lower():
+        key_points.append("Discussion points noted")
+
+    action_items = [
+        line.strip()
+        for line in text.splitlines()
+        if any(k in line.lower() for k in ["action:", "todo:", "- [ ]", "* [ ]"])
+    ]
+
+    return overview, key_points, action_items
+
+
+def _display_meeting_summary(
+    overview: str, key_points: list[str], action_items: list[str], output_format: str,
+) -> None:
+    """Display meeting summary in the specified format."""
+    if output_format == "json":
+        console.print_json(
+            data={
+                "overview": overview,
+                "key_points": key_points,
+                "action_items": action_items,
+            },
+        )
+    else:
+        console.print("Overview")
+        console.print(overview)
+        console.print("\nKey Points")
+        for point in key_points:
+            console.print(f"• {point}")
+        console.print("\nAction Items")
+        for item in action_items:
+            console.print(f"- {item}")
+
+
+@app.command("meeting")
+def summarize_meeting(
+    file_path: str = typer.Argument(..., help="Path to meeting notes (txt|md)"),
+    output_format: str = typer.Option("rich", "--format", help="[txt|md|json|rich]"),
+) -> None:
+    """Summarize meeting notes from a text or markdown file."""
+    path = Path(file_path)
+    if not path.exists() or not path.is_file():
+        console.print(f"[red]Error:[/red] File not found: {file_path}")
+        raise typer.Exit(1)
+
+    if path.suffix.lower() not in {".txt", ".md"}:
+        console.print("[red]Error:[/red] Unsupported file format. Use .txt or .md")
+        raise typer.Exit(2)
+
+    try:
+        overview, key_points, action_items = _parse_meeting_file(file_path)
+        _display_meeting_summary(overview, key_points, action_items, output_format)
+    except Exception as e:
+        console.print(f"[red]Unexpected error:[/red] {e}")
+        raise typer.Exit(4) from e

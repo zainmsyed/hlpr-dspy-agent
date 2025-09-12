@@ -42,7 +42,11 @@ def accounts_add(
     if account_id in _accounts:
         console.print("Account exists")
         raise typer.Exit(1)
-    _accounts[account_id] = {"provider": provider, "username": username, "host": host}
+    _accounts[account_id] = {
+        "provider": provider,
+        "username": username,
+        "host": host,
+    }
     console.print("Account added")
     raise typer.Exit(0)
 
