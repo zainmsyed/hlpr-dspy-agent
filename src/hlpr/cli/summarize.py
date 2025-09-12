@@ -32,10 +32,10 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         ),
     ),
         save: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
-        default=False,
-        help="Save summary to file",
-        param_decls=["--save"],
-    ),
+            False,
+            "--save",
+            help="Save summary to file",
+        ),
     output_format: str = typer.Option(
         "rich",
         "--format",
@@ -64,9 +64,9 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         ),
     ),
     verbose: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
-        default=False,
+        False,
+        "--verbose",
         help="Enable verbose output",
-        param_decls=["--verbose"],
     ),
 ):
     """Summarize a document (PDF, DOCX, TXT, MD)."""
