@@ -37,3 +37,8 @@ ignore = ["S101", "PLR2004"]  # Ignore assert and magic values in tests
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src"
+]
