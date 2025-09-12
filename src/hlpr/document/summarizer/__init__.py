@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from hlpr.document.chunker import DocumentChunker
 from hlpr.document.progress import (
     ProcessingPhase,
+    ProgressContext,
     ProgressTracker,
     create_progress_tracker,
 )
@@ -35,7 +36,7 @@ class DocumentSummarizer:
     def __init__(  # noqa: PLR0913 - initializer exposes config knobs for UX
         self,
         provider: str = "local",
-        model: str = "llama3.2",
+    model: str = "gemma3:latest",
         api_base: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 8192,
@@ -110,9 +111,7 @@ class DocumentSummarizer:
 
         try:
             # Use DSPy summarizer
-            with self.progress_tracker.start_phase(
-                ProcessingPhase.SUMMARIZING, items_total=1,
-            ) as metrics:
+            with ProgressContext(self.progress_tracker, ProcessingPhase.SUMMARIZING, items_total=1) as metrics:
                 dspy_result = self.dspy_summarizer.summarize(document.extracted_text)
                 metrics.items_processed = 1
 
@@ -205,7 +204,8 @@ class DocumentSummarizer:
             return self.summarize_document(document)
 
         # Split text into chunks using the document chunker
-        with self.progress_tracker.start_phase(
+        with ProgressContext(
+            self.progress_tracker,
             ProcessingPhase.CHUNKING,
             items_total=1,
             metadata={"strategy": chunking_strategy},
@@ -224,8 +224,10 @@ class DocumentSummarizer:
         try:
             # Summarize each chunk
             chunk_summaries = []
-            with self.progress_tracker.start_phase(
-                ProcessingPhase.SUMMARIZING, items_total=len(chunks),
+            with ProgressContext(
+                self.progress_tracker,
+                ProcessingPhase.SUMMARIZING,
+                items_total=len(chunks),
             ) as summary_metrics:
                 for i, chunk in enumerate(chunks):
                     chunk_title = f"Part {i + 1} of {len(chunks)}"

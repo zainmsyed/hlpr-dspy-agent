@@ -51,7 +51,7 @@ class DSPyDocumentSummarizer:
     def __init__(  # noqa: PLR0913 - public initializer keeps backward-compatible args
         self,
         provider: str = "local",
-        model: str = "llama3.2",
+    model: str = "gemma3:latest",
         api_base: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 8192,
@@ -258,14 +258,32 @@ class DSPyDocumentSummarizer:
         try:
             with ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(_call_summarizer)
+
+                # Fast-fail strategy: wait a short period for immediate failures
+                # (model-not-found, invalid-config). If we don't get a result
+                # within the short window, cancel and abort quickly instead of
+                # waiting the full timeout which is undesirable for local use.
+                FAST_FAIL_SECONDS = 1.0
                 try:
-                    result = future.result(timeout=self.timeout)
-                except FutureTimeoutError as err:
+                    result = future.result(timeout=FAST_FAIL_SECONDS)
+                except FutureTimeoutError:
+                    # No immediate response; attempt to get final result but
+                    # don't block the caller for the full timeout. Try to
+                    # cancel the future and raise so callers can handle
+                    # non-responsive LLMs deterministically.
+                    try:
+                        future.cancel()
+                    except Exception:
+                        # Best-effort cancel; continue to raise
+                        pass
+
                     processing_time_ms = int((time.time() - start_time) * 1000)
-                    msg = f"DSPy summarization timed out after {self.timeout} seconds"
-                    # Log the timeout with exception context and re-raise with chaining
-                    logger.exception(msg)
-                    raise RuntimeError(msg) from err
+                    msg = (
+                        "DSPy summarization did not respond immediately; "
+                        "aborting to avoid long waits (fast-fail)."
+                    )
+                    logger.warning(msg)
+                    raise RuntimeError(msg)
 
             # Ensure key_points is a list
             key_points = result.key_points
@@ -313,7 +331,7 @@ class DSPyDocumentSummarizer:
 
 def create_dspy_summarizer(
     provider: str = "local",
-    model: str = "llama3.2",
+    model: str = "gemma3:latest",
     timeout: int = 30,
     **kwargs,
 ) -> DSPyDocumentSummarizer:

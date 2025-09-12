@@ -21,7 +21,7 @@ def list_providers() -> dict[str, list[dict[str, str | bool]]]:
         {
             "id": "local",
             "type": "LOCAL",  # Allowed: LOCAL | OPENAI | ANTHROPIC
-            "model_name": "llama2:7b",
+            "model_name": "gemma3:latest",
             "is_default": True,
             "status": "AVAILABLE",  # Allowed: AVAILABLE | UNAVAILABLE | ERROR
         },
