@@ -17,23 +17,41 @@ class TestCliEmailProcessContract:
 
         # Should attempt to process but fail due to missing account
         assert result.exit_code in [1, 2]  # Config error or account not found
-        assert "account" in result.output.lower() or "error" in result.output.lower()
+        out = result.output.lower()
+        assert "account" in out or "error" in out
 
     def test_email_process_with_filters(self):
         """Test email processing with various filters"""
         result = runner.invoke(
             app,
-            ["email", "process", "test_account", "--mailbox", "INBOX", "--unread-only", "--limit", "10"],
+            [
+                "email",
+                "process",
+                "test_account",
+                "--mailbox",
+                "INBOX",
+                "--unread-only",
+                "--limit",
+                "10",
+            ],
         )
 
         assert result.exit_code in [1, 2]  # Will fail due to missing account/config
-        # But should show it parsed the arguments correctly
-
+        # This would test IMAP auth failures, but since endpoint doesn't exist,
+        # it will fail (placeholder for future implementation)
     def test_email_process_with_date_filter(self):
         """Test email processing with since date filter"""
         result = runner.invoke(
             app,
-            ["email", "process", "test_account", "--since", "2025-09-01", "--limit", "5"],
+            [
+                "email",
+                "process",
+                "test_account",
+                "--since",
+                "2025-09-01",
+                "--limit",
+                "5",
+            ],
         )
 
         assert result.exit_code in [1, 2]
@@ -44,7 +62,16 @@ class TestCliEmailProcessContract:
         output_file = Path("email_results.csv")
         result = runner.invoke(
             app,
-            ["email", "process", "test_account", "--save", "--format", "csv", "--output", str(output_file)],
+            [
+                "email",
+                "process",
+                "test_account",
+                "--save",
+                "--format",
+                "csv",
+                "--output",
+                str(output_file),
+            ],
         )
 
         assert result.exit_code in [1, 2]  # Will fail due to missing account
@@ -55,7 +82,8 @@ class TestCliEmailProcessContract:
         result = runner.invoke(app, ["email", "process", "invalid_account_123"])
 
         assert result.exit_code == 1
-        assert "account" in result.output.lower() or "not found" in result.output.lower()
+        out = result.output.lower()
+        assert "account" in out or "not found" in out
 
     def test_email_process_missing_account_id(self):
         """Test command without required account ID"""
@@ -68,7 +96,15 @@ class TestCliEmailProcessContract:
         """Test email processing filtered by sender"""
         result = runner.invoke(
             app,
-            ["email", "process", "test_account", "--from", "test@example.com", "--limit", "20"],
+            [
+                "email",
+                "process",
+                "test_account",
+                "--from",
+                "test@example.com",
+                "--limit",
+                "20",
+            ],
         )
 
         assert result.exit_code in [1, 2]
@@ -78,7 +114,13 @@ class TestCliEmailProcessContract:
         """Test email processing with large limit"""
         result = runner.invoke(
             app,
-            ["email", "process", "test_account", "--limit", "1500"],  # Over max 1000
+            [
+                "email",
+                "process",
+                "test_account",
+                "--limit",
+                "1500",
+            ],
         )
 
         assert result.exit_code in [1, 2]

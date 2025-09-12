@@ -1,6 +1,24 @@
-# Tasks: Document & Article Summarization
+# Tasks: Document & Article Summariz## 📊 **Current Status: Phase 3.4 COMPLETE** ✅
 
-**Input**: Design documents from `/home/zain/Documents/coding/hlpr/specs/002-document-article-summarization/`
+**Completed Tasks (T001-T017):**
+- ✅ **Setup Phase (3.1)**: Document module structure, dependencies, linting
+- ✅ **Tests Phase (3.2)**: Contract tests, integration tests (TDD approach)
+- ✅ **Core Implementation (3.3)**: Document model, parser, summarizer, CLI, API
+- ✅ **Integration Phase (3.4)**: DSPy integration, chunking, progress tracking, provider integration
+
+**Key Achievements:**
+- Document processing supports PDF, DOCX, TXT, MD formats
+- CLI command `hlpr summarize document` with rich output
+- API endpoint `POST /summarize/document` with file upload
+- DSPy integration with fallback for reliability
+- Comprehensive test coverage (5/5 document tests passing)
+- Advanced chunking strategies (sentence, paragraph, fixed, token-based)
+- Progress tracking with Rich UI and console fallbacks
+- Multi-provider LLM support (local, OpenAI, Anthropic, Groq, Together AI)
+- Security hardening: path validation, streaming processing, thread safety
+
+**Next Phase: 3.5 Polish**
+- T018-T021: Unit tests, performance, documentation, quickstart updatesDesign documents from `/home/zain/Documents/coding/hlpr/specs/002-document-article-summarization/`
 **Prerequisites**: plan.md ✓, research.md ✓, data-model.md ✓, contracts/ ✓, quickstart.md ✓
 
 ## Execution Flow (main)
@@ -36,11 +54,11 @@
 
 ## 📊 **Current Status: Phase 3.3 COMPLETE** ✅
 
-**Completed Tasks (T001-T013):**
+**Completed Tasks (T001-T017):**
 - ✅ **Setup Phase (3.1)**: Document module structure, dependencies, linting
 - ✅ **Tests Phase (3.2)**: Contract tests, integration tests (TDD approach)
 - ✅ **Core Implementation (3.3)**: Document model, parser, summarizer, CLI, API
-- ✅ **Security & Quality**: Input validation, error handling, critical fixes
+- ✅ **Integration Phase (3.4)**: DSPy integration, chunking, progress tracking, provider integration
 
 **Key Achievements:**
 - Document processing supports PDF, DOCX, TXT, MD formats
@@ -88,10 +106,10 @@ Single project structure per plan.md:
 - [x] **T013** Error handling for document processing
 
 ## Phase 3.4: Integration
-- [ ] **T014** DSPy integration for document summarization in src/hlpr/llm/dspy_integration.py
-- [ ] **T015** Chunking strategy for large documents in src/hlpr/document/chunker.py
-- [ ] **T016** Progress tracking for document processing
-- [ ] **T017** LLM provider integration (local/cloud) for documents
+- [x] **T014** DSPy integration for document summarization in src/hlpr/llm/dspy_integration.py
+- [x] **T015** Chunking strategy for large documents in src/hlpr/document/chunker.py
+- [x] **T016** Progress tracking for document processing
+- [x] **T017** LLM provider integration (local/cloud) for documents
 
 ## Phase 3.5: Polish
 - [ ] **T018** [P] Unit tests for document parsing in tests/unit/test_document_parser.py

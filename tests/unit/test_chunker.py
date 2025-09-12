@@ -1,11 +1,13 @@
 import pytest
+
 from hlpr.document.chunker import Chunker
 
 
 def test_chunker_basic():
-    text = """
-    This is the first sentence. This is the second sentence. This is the third sentence.
-    """
+    text = (
+        "This is the first sentence. This is the second sentence. "
+        "This is the third sentence."
+    )
     c = Chunker(chunk_size=50, overlap=10)
     chunks = c.chunk_text(text)
     assert len(chunks) >= 1
@@ -18,5 +20,6 @@ def test_chunker_empty():
 
 
 def test_chunker_invalid_params():
-    with pytest.raises(ValueError):
+    # overlap must be less than chunk_size
+    with pytest.raises(ValueError, match="Chunk size must be greater than overlap"):
         Chunker(chunk_size=10, overlap=20)

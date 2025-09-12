@@ -1,4 +1,3 @@
-import time
 import pytest
 
 from hlpr.llm.dspy_integration import DSPyDocumentSummarizer
@@ -8,7 +7,7 @@ def test_dspy_timeout_short():
     # If DSPy is not available, the constructor may raise; handle gracefully
     try:
         summarizer = DSPyDocumentSummarizer(provider="local", timeout=1)
-    except Exception:
+    except Exception:  # noqa: BLE001 - test probes environment availability
         pytest.skip("DSPy not available in test environment")
 
     # Use a long input that may take time; we expect a timeout runtime error
@@ -21,7 +20,7 @@ def test_dspy_timeout_short():
 def test_dspy_no_timeout():
     try:
         summarizer = DSPyDocumentSummarizer(provider="local", timeout=30)
-    except Exception:
+    except Exception:  # noqa: BLE001 - test probes environment availability
         pytest.skip("DSPy not available in test environment")
 
     short_text = "This is a short test text."

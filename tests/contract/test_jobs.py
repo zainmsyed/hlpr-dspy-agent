@@ -22,7 +22,12 @@ class TestJobsContract:
             data = response.json()
             assert "id" in data
             assert "type" in data
-            assert data["type"] in ["DOCUMENT_SUMMARY", "EMAIL_PROCESS", "MEETING_ANALYSIS"]
+            allowed = [
+                "DOCUMENT_SUMMARY",
+                "EMAIL_PROCESS",
+                "MEETING_ANALYSIS",
+            ]
+            assert data["type"] in allowed
             assert "status" in data
             assert data["status"] in ["QUEUED", "RUNNING", "COMPLETED", "FAILED"]
             assert "progress_percent" in data

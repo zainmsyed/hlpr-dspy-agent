@@ -43,7 +43,16 @@ class TestCliSummarizeDocumentContract:
         output_file = Path("summary.json")
         result = runner.invoke(
             app,
-            ["summarize", "document", "--save", "--format", "json", "--output", str(output_file), str(test_file)],
+            [
+                "summarize",
+                "document",
+                "--save",
+                "--format",
+                "json",
+                "--output",
+                str(output_file),
+                str(test_file),
+            ],
         )
 
         assert result.exit_code == 0
@@ -67,7 +76,8 @@ class TestCliSummarizeDocumentContract:
         result = runner.invoke(app, ["summarize", "document", str(test_file)])
 
         assert result.exit_code == 2
-        assert "unsupported" in result.output.lower() or "format" in result.output.lower()
+        out = result.output.lower()
+        assert "unsupported" in out or "format" in out
 
         # Clean up
         test_file.unlink(missing_ok=True)

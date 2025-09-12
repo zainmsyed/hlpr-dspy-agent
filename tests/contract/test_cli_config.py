@@ -1,3 +1,4 @@
+import pytest
 from typer.testing import CliRunner
 
 from hlpr.cli.main import app
@@ -28,7 +29,7 @@ class TestCliConfigContract:
             config = json.loads(result.output)
             assert isinstance(config, dict)
         except json.JSONDecodeError:
-            assert False, "Output is not valid JSON"
+            pytest.fail("Output is not valid JSON")
 
     def test_config_show_hide_sensitive(self):
         """Test hiding sensitive configuration values"""
@@ -55,7 +56,10 @@ class TestCliConfigContract:
     def test_config_get_existing_key(self):
         """Test getting an existing configuration value"""
         # First set a value
-        set_result = runner.invoke(app, ["config", "set", "test_get_key", "test_get_value"])
+        set_result = runner.invoke(
+            app,
+            ["config", "set", "test_get_key", "test_get_value"],
+        )
         if set_result.exit_code == 0:
             # Then get it
             get_result = runner.invoke(app, ["config", "get", "test_get_key"])
@@ -64,10 +68,14 @@ class TestCliConfigContract:
 
     def test_config_get_nonexistent_key(self):
         """Test getting a non-existent configuration key"""
-        result = runner.invoke(app, ["config", "get", "nonexistent_key"])
+        result = runner.invoke(
+            app,
+            ["config", "get", "nonexistent_key"],
+        )
 
         assert result.exit_code == 1
-        assert "not found" in result.output.lower() or "not set" in result.output.lower()
+        out = result.output.lower()
+        assert "not found" in out or "not set" in out
 
     def test_config_get_without_key(self):
         """Test config get command without key argument"""

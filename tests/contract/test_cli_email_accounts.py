@@ -21,19 +21,44 @@ class TestCliEmailAccountsContract:
         """Test adding email account with basic options"""
         result = runner.invoke(
             app,
-            ["email", "accounts", "add", "test_account", "--provider", "gmail", "--username", "test@gmail.com", "--password", "testpass"],
+            [
+                "email",
+                "accounts",
+                "add",
+                "test_account",
+                "--provider",
+                "gmail",
+                "--username",
+                "test@gmail.com",
+                "--password",
+                "testpass",
+            ],
         )
 
         # Should succeed or fail gracefully
         assert result.exit_code in [0, 1, 2]
         if result.exit_code == 0:
-            assert "success" in result.output.lower() or "added" in result.output.lower()
+            out = result.output.lower()
+            assert "success" in out or "added" in out
 
     def test_email_accounts_add_custom_provider(self):
         """Test adding account with custom provider"""
         result = runner.invoke(
             app,
-            ["email", "accounts", "add", "custom_account", "--provider", "custom", "--host", "mail.example.com", "--username", "user@example.com", "--password", "password"],
+            [
+                "email",
+                "accounts",
+                "add",
+                "custom_account",
+                "--provider",
+                "custom",
+                "--host",
+                "mail.example.com",
+                "--username",
+                "user@example.com",
+                "--password",
+                "password",
+            ],
         )
 
         assert result.exit_code in [0, 1, 2]
@@ -47,59 +72,112 @@ class TestCliEmailAccountsContract:
 
         # Should fail due to missing username/password
         assert result.exit_code == 2
-        assert "required" in result.output.lower() or "username" in result.output.lower()
+        out = result.output.lower()
+        assert "required" in out or "username" in out
 
     def test_email_accounts_add_duplicate_id(self):
         """Test adding account with duplicate ID"""
         # First add an account
         result1 = runner.invoke(
             app,
-            ["email", "accounts", "add", "duplicate_test", "--provider", "gmail", "--username", "test@gmail.com", "--password", "pass"],
+            [
+                "email",
+                "accounts",
+                "add",
+                "duplicate_test",
+                "--provider",
+                "gmail",
+                "--username",
+                "test@gmail.com",
+                "--password",
+                "pass",
+            ],
         )
 
         if result1.exit_code == 0:
             # Try to add again
             result2 = runner.invoke(
                 app,
-                ["email", "accounts", "add", "duplicate_test", "--provider", "gmail", "--username", "test2@gmail.com", "--password", "pass"],
+                [
+                    "email",
+                    "accounts",
+                    "add",
+                    "duplicate_test",
+                    "--provider",
+                    "gmail",
+                    "--username",
+                    "test2@gmail.com",
+                    "--password",
+                    "pass",
+                ],
             )
             assert result2.exit_code == 1
-            assert "exists" in result2.output.lower() or "duplicate" in result2.output.lower()
+            out = result2.output.lower()
+            assert "exists" in out or "duplicate" in out
 
     def test_email_accounts_remove_existing(self):
         """Test removing an existing account"""
         # First add an account
         result1 = runner.invoke(
             app,
-            ["email", "accounts", "add", "remove_test", "--provider", "gmail", "--username", "test@gmail.com", "--password", "pass"],
+            [
+                "email",
+                "accounts",
+                "add",
+                "remove_test",
+                "--provider",
+                "gmail",
+                "--username",
+                "test@gmail.com",
+                "--password",
+                "pass",
+            ],
         )
 
         if result1.exit_code == 0:
             # Then remove it
             result2 = runner.invoke(app, ["email", "accounts", "remove", "remove_test"])
             assert result2.exit_code == 0
-            assert "removed" in result2.output.lower() or "deleted" in result2.output.lower()
+            out = result2.output.lower()
+            assert "removed" in out or "deleted" in out
 
     def test_email_accounts_remove_nonexistent(self):
         """Test removing non-existent account"""
-        result = runner.invoke(app, ["email", "accounts", "remove", "nonexistent_account"])
+        result = runner.invoke(
+            app,
+            ["email", "accounts", "remove", "nonexistent_account"],
+        )
 
         assert result.exit_code == 1
-        assert "not found" in result.output.lower() or "exists" in result.output.lower()
+        out = result.output.lower()
+        assert "not found" in out or "exists" in out
 
     def test_email_accounts_test_connection(self):
         """Test testing account connection"""
         # First add an account
         result1 = runner.invoke(
             app,
-            ["email", "accounts", "add", "test_conn", "--provider", "gmail", "--username", "test@gmail.com", "--password", "pass"],
+            [
+                "email",
+                "accounts",
+                "add",
+                "test_conn",
+                "--provider",
+                "gmail",
+                "--username",
+                "test@gmail.com",
+                "--password",
+                "pass",
+            ],
         )
 
         if result1.exit_code == 0:
             # Then test connection
-            result2 = runner.invoke(app, ["email", "accounts", "test", "test_conn"])
+            result2 = runner.invoke(
+                app, ["email", "accounts", "test", "test_conn"],
+            )
             # Connection test may succeed or fail depending on credentials
-            assert result2.exit_code in [0, 1, 3]  # Success, general error, or auth error
+            assert result2.exit_code in [0, 1, 3]
 
     def test_email_accounts_test_nonexistent(self):
         """Test testing connection for non-existent account"""

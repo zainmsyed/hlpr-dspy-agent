@@ -75,8 +75,8 @@ class TestEmailProcessContract:
 
     def test_email_process_authentication_failure(self):
         """Test handling of authentication failures"""
-        # This would test IMAP auth failures, but since endpoint doesn't exist, it will fail
-        # Placeholder for future implementation
+        # This would test IMAP auth failures. Since endpoint doesn't exist,
+        # it will fail (placeholder for future implementation)
 
     def test_email_process_large_limit(self):
         """Test processing with large email limit"""

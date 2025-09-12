@@ -12,7 +12,10 @@ class TestSummarizeMeetingContract:
         """Test meeting summarization with raw text content"""
         # This test will fail until the endpoint is implemented
         payload = {
-            "content": "Meeting notes: Discussed project timeline. Action items: John to update docs by Friday.",
+            "content": (
+                "Meeting notes: Discussed project timeline. Action items: "
+                "John to update docs by Friday."
+            ),
             "title": "Project Planning Meeting",
             "date": "2025-09-09T10:00:00Z",
             "provider_id": "local",
@@ -60,7 +63,10 @@ class TestSummarizeMeetingContract:
     def test_summarize_meeting_with_action_items(self):
         """Test extraction of action items from meeting content"""
         payload = {
-            "content": "John will update the documentation. Sarah needs to review the code. Team to discuss budget next week.",
+            "content": (
+                "John will update the documentation. Sarah needs to review the code. "
+                "Team to discuss budget next week."
+            ),
             "title": "Development Meeting",
         }
 

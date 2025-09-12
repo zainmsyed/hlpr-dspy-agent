@@ -1,9 +1,8 @@
 """Summarize command for hlpr CLI."""
 
 import json
-import time
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -23,103 +22,100 @@ console = Console()
 
 
 @app.command("document")
-def summarize_document(
+def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
-    provider: str = typer.Option("local", "--provider", help="AI provider to use [local|openai|anthropic]"),
-    save: bool = typer.Option(False, "--save", help="Save summary to file"),
-    format: str = typer.Option("rich", "--format", help="Output format [txt|md|json|rich]"),
-    output: Optional[str] = typer.Option(None, "--output", help="Output file path"),
-    chunk_size: int = typer.Option(8192, "--chunk-size", help="Chunk size for large documents"),
-    chunk_overlap: int = typer.Option(256, "--chunk-overlap", help="Overlap between chunks"),
-    verbose: bool = typer.Option(False, "--verbose", help="Enable verbose output"),
+    provider: str = typer.Option(
+        "local",
+        "--provider",
+        help=(
+            "AI provider to use [local|openai|anthropic|groq|together]"
+        ),
+    ),
+        save: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+        default=False,
+        help="Save summary to file",
+        param_decls=["--save"],
+    ),
+    output_format: str = typer.Option(
+        "rich",
+        "--format",
+        help="Output format [txt|md|json|rich]",
+    ),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        help="Output file path",
+    ),
+    chunk_size: int = typer.Option(
+        8192,
+        "--chunk-size",
+        help="Chunk size for large documents",
+    ),
+    chunk_overlap: int = typer.Option(
+        256,
+        "--chunk-overlap",
+        help="Overlap between chunks",
+    ),
+    chunking_strategy: str = typer.Option(
+        "sentence",
+        "--chunking-strategy",
+        help=(
+            "Chunking strategy [sentence|paragraph|fixed|token]"
+        ),
+    ),
+    verbose: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+        default=False,
+        help="Enable verbose output",
+        param_decls=["--verbose"],
+    ),
 ):
     """Summarize a document (PDF, DOCX, TXT, MD)."""
+    # Validate file exists (outside try to avoid TRY301)
+    path = Path(file_path)
+    if not path.exists():
+        console.print(f"[red]Error:[/red] File not found: {file_path}")
+        raise typer.Exit(1)
+
+    if not path.is_file():
+        console.print(f"[red]Error:[/red] Path is not a file: {file_path}")
+        raise typer.Exit(1)
+
     try:
-        # Validate file exists
-        path = Path(file_path)
-        if not path.exists():
-            console.print(f"[red]Error:[/red] File not found: {file_path}")
-            raise typer.Exit(1)
+        document, extracted_text = _parse_with_progress(file_path, verbose)
 
-        if not path.is_file():
-            console.print(f"[red]Error:[/red] Path is not a file: {file_path}")
-            raise typer.Exit(1)
+        # Initialize summarizer
+        summarizer = DocumentSummarizer(provider=provider)
 
-        # Show progress for parsing
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            disable=not verbose,
-        ) as progress:
-            parse_task = progress.add_task("Parsing document...", total=None)
-
-            # Parse document
-            try:
-                extracted_text = DocumentParser.parse_file(file_path)
-                progress.update(parse_task, completed=True, description="Document parsed successfully")
-            except ValueError as e:
-                # Distinguish unsupported format vs general parsing failure
-                msg = str(e).lower()
-                if "unsupported" in msg or "unsupported file format" in msg:
-                    progress.update(parse_task, completed=True, description=f"Unsupported format: {e}")
-                    console.print(f"[red]Error:[/red] Unsupported file format: {e}")
-                    raise typer.Exit(2)
-                else:
-                    progress.update(parse_task, completed=True, description=f"Failed to parse document: {e}")
-                    console.print(f"[red]Error:[/red] Failed to parse document: {e}")
-                    raise typer.Exit(6)
-            except Exception as e:
-                progress.update(parse_task, completed=True, description=f"Failed to parse document: {e}")
-                console.print(f"[red]Error:[/red] Failed to parse document: {e}")
-                raise typer.Exit(6)
-
-            # Create document model
-            document = Document.from_file(file_path)
-            document.extracted_text = extracted_text
-
-            # Initialize summarizer
-            summarizer = DocumentSummarizer(provider=provider)
-
-            # Summarize document
-            summarize_task = progress.add_task("Generating summary...", total=None)
-
-            try:
-                if len(extracted_text) > chunk_size:
-                    # Use chunking for large documents
-                    result = summarizer.summarize_large_document(
-                        document, chunk_size=chunk_size, overlap=chunk_overlap
-                    )
-                else:
-                    result = summarizer.summarize_document(document)
-
-                progress.update(summarize_task, completed=True, description="Summary generated successfully")
-
-            except Exception as e:
-                progress.update(summarize_task, completed=True, description=f"Failed to generate summary: {e}")
-                console.print(f"[red]Error:[/red] Failed to generate summary: {e}")
-                raise typer.Exit(5)
+        # Summarize with progress
+        result = _summarize_with_progress(
+            summarizer,
+            document,
+            extracted_text,
+            chunk_size,
+            chunk_overlap,
+            chunking_strategy,
+            verbose,
+        )
 
         # Display results
-        _display_summary(document, result, format)
+        _display_summary(document, result, output_format)
 
         # Save to file if requested
         if save:
-            output_path = _save_summary(document, result, format, output)
+            output_path = _save_summary(document, result, output_format, output)
             console.print(f"\n[green]Summary saved to:[/green] {output_path}")
 
     except typer.Exit:
         raise
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(4)
+        raise typer.Exit(4) from e
 
 
-def _display_summary(document: Document, result, format: str):
+def _display_summary(document: Document, result: Any, output_format: str) -> None:
     """Display the summary results in the specified format."""
-    if format == "rich":
+    if output_format == "rich":
         # Rich terminal display
-        title = f"Document Summary: {Path(document.path).name}"
         summary_panel = Panel(
             result.summary,
             title="[bold blue]Summary[/bold blue]",
@@ -128,7 +124,9 @@ def _display_summary(document: Document, result, format: str):
         console.print(summary_panel)
 
         if result.key_points:
-            key_points_text = "\n".join(f"• {point}" for point in result.key_points)
+            key_points_text = "\n".join(
+                f"• {point}" for point in result.key_points
+            )
             key_points_panel = Panel(
                 key_points_text,
                 title="[bold green]Key Points[/bold green]",
@@ -142,7 +140,7 @@ def _display_summary(document: Document, result, format: str):
         metadata.append(f"Format: {document.format.value.upper()}\n")
         metadata.append(f"Size: {document.size_bytes:,} bytes\n")
         metadata.append(f"Processing time: {result.processing_time_ms}ms\n")
-        metadata.append(f"Provider: {getattr(result, 'provider', 'unknown')}")
+        metadata.append("Provider: {}".format(getattr(result, "provider", "unknown")))
 
         metadata_panel = Panel(
             metadata,
@@ -151,7 +149,7 @@ def _display_summary(document: Document, result, format: str):
         )
         console.print(metadata_panel)
 
-    elif format == "json":
+    elif output_format == "json":
         # JSON output
         output_data = {
             "file": str(Path(document.path).name),
@@ -163,7 +161,7 @@ def _display_summary(document: Document, result, format: str):
         }
         console.print_json(data=output_data)
 
-    elif format == "txt":
+    elif output_format == "txt":
         # Plain text output
         console.print(f"Document: {Path(document.path).name}")
         console.print(f"Format: {document.format.value.upper()}")
@@ -178,7 +176,7 @@ def _display_summary(document: Document, result, format: str):
             for point in result.key_points:
                 console.print(f"• {point}")
 
-    elif format == "md":
+    elif output_format == "md":
         # Markdown output
         console.print(f"# Document Summary: {Path(document.path).name}")
         console.print()
@@ -197,26 +195,47 @@ def _display_summary(document: Document, result, format: str):
                 console.print(f"- {point}")
 
 
-def _save_summary(document: Document, result, format: str, output_path: Optional[str]) -> str:
+def _save_summary(
+    document: Document,
+    result: Any,
+    output_format: str,
+    output_path: str | None,
+) -> str:
     """Save the summary to a file."""
-    if output_path:
-        save_path = Path(output_path)
-    else:
-        # Auto-generate output path
-        doc_name = Path(document.path).stem
-        if format == "json":
-            save_path = Path(f"{doc_name}_summary.json")
-        elif format == "md":
-            save_path = Path(f"{doc_name}_summary.md")
-        else:
-            save_path = Path(f"{doc_name}_summary.txt")
+    save_path = _determine_output_path(document, output_format, output_path)
 
     # Ensure we don't overwrite without warning
     if save_path.exists():
-        console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {save_path}")
+        warn_msg = f"Overwriting existing file: {save_path}"
+        console.print(f"[yellow]Warning:[/yellow] {warn_msg}")
 
-    # Generate content based on format
-    if format == "json":
+    content = _format_summary_content(document, result, output_format)
+
+    # Write to file
+    with save_path.open("w", encoding="utf-8") as f:
+        f.write(content)
+
+    return str(save_path)
+
+
+def _determine_output_path(
+    document: Document, output_format: str, output_path: str | None,
+) -> Path:
+    """Compute output file path based on format and user input."""
+    if output_path:
+        return Path(output_path)
+
+    doc_name = Path(document.path).stem
+    if output_format == "json":
+        return Path(f"{doc_name}_summary.json")
+    if output_format == "md":
+        return Path(f"{doc_name}_summary.md")
+    return Path(f"{doc_name}_summary.txt")
+
+
+def _format_summary_content(document: Document, result: Any, output_format: str) -> str:
+    """Generate summary content in the requested format."""
+    if output_format == "json":
         output_data = {
             "file": str(Path(document.path).name),
             "format": document.format.value,
@@ -225,9 +244,9 @@ def _save_summary(document: Document, result, format: str, output_path: Optional
             "key_points": result.key_points,
             "processing_time_ms": result.processing_time_ms,
         }
-        content = json.dumps(output_data, indent=2)
+        return json.dumps(output_data, indent=2)
 
-    elif format == "md":
+    if output_format == "md":
         content = f"# Document Summary: {Path(document.path).name}\n\n"
         content += f"- **Format**: {document.format.value.upper()}\n"
         content += f"- **Size**: {document.size_bytes:,} bytes\n"
@@ -238,21 +257,95 @@ def _save_summary(document: Document, result, format: str, output_path: Optional
             content += "## Key Points\n\n"
             for point in result.key_points:
                 content += f"- {point}\n"
+        return content
 
-    else:  # txt or rich
-        content = f"Document: {Path(document.path).name}\n"
-        content += f"Format: {document.format.value.upper()}\n"
-        content += f"Size: {document.size_bytes:,} bytes\n"
-        content += f"Processing time: {result.processing_time_ms}ms\n\n"
-        content += "SUMMARY:\n"
-        content += f"{result.summary}\n\n"
-        if result.key_points:
-            content += "KEY POINTS:\n"
-            for point in result.key_points:
-                content += f"• {point}\n"
+    # txt or rich
+    content = f"Document: {Path(document.path).name}\n"
+    content += f"Format: {document.format.value.upper()}\n"
+    content += f"Size: {document.size_bytes:,} bytes\n"
+    content += f"Processing time: {result.processing_time_ms}ms\n\n"
+    content += "SUMMARY:\n"
+    content += f"{result.summary}\n\n"
+    if result.key_points:
+        content += "KEY POINTS:\n"
+        for point in result.key_points:
+            content += f"• {point}\n"
+    return content
 
-    # Write to file
-    with save_path.open("w", encoding="utf-8") as f:
-        f.write(content)
 
-    return str(save_path)
+def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:  # noqa: FBT001
+    """Parse the document file with a progress indicator and return model+text."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        disable=not verbose,
+    ) as progress:
+        parse_task = progress.add_task("Parsing document...", total=None)
+        try:
+            extracted_text = DocumentParser.parse_file(file_path)
+            desc = "Document parsed successfully"
+            progress.update(parse_task, completed=True, description=desc)
+        except ValueError as e:
+            # Distinguish unsupported format vs general parsing failure
+            msg = str(e).lower()
+            if "unsupported" in msg or "unsupported file format" in msg:
+                err_msg = f"Unsupported file format: {e}"
+                desc = f"Unsupported format: {e}"
+                progress.update(parse_task, completed=True, description=desc)
+                console.print(f"[red]Error:[/red] {err_msg}")
+                raise typer.Exit(2) from e
+            err_msg = f"Failed to parse document: {e}"
+            desc = err_msg
+            progress.update(parse_task, completed=True, description=desc)
+            console.print(f"[red]Error:[/red] {err_msg}")
+            raise typer.Exit(6) from e
+        except Exception as e:
+            err_msg = f"Failed to parse document: {e}"
+            progress.update(parse_task, completed=True, description=err_msg)
+            console.print(f"[red]Error:[/red] {err_msg}")
+            raise typer.Exit(6) from e
+
+    document = Document.from_file(file_path)
+    document.extracted_text = extracted_text
+    return document, extracted_text
+
+
+def _summarize_with_progress(  # noqa: PLR0913
+    summarizer: DocumentSummarizer,
+    document: Document,
+    extracted_text: str,
+    chunk_size: int,
+    chunk_overlap: int,
+    chunking_strategy: str,
+    verbose: bool,  # noqa: FBT001
+):
+    """Generate summary with a progress indicator, using chunking when needed."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        disable=not verbose,
+    ) as progress:
+        summarize_task = progress.add_task("Generating summary...", total=None)
+        try:
+            if len(extracted_text) > chunk_size:
+                # Use chunking for large documents
+                result = summarizer.summarize_large_document(
+                    document,
+                    chunk_size=chunk_size,
+                    overlap=chunk_overlap,
+                    chunking_strategy=chunking_strategy,
+                )
+            else:
+                result = summarizer.summarize_document(document)
+        except Exception as e:
+            err_msg = f"Failed to generate summary: {e}"
+            desc = err_msg
+            progress.update(summarize_task, completed=True, description=desc)
+            console.print(f"[red]Error:[/red] {err_msg}")
+            raise typer.Exit(5) from e
+        else:
+            desc = "Summary generated successfully"
+            progress.update(summarize_task, completed=True, description=desc)
+            return result

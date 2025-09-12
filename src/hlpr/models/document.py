@@ -1,14 +1,11 @@
 """Document model for hlpr document summarization feature."""
 
-import hashlib
-from datetime import datetime
-from enum import Enum
-from pathlib import Path
 import tempfile
-from typing import List, Optional
-from uuid import UUID, uuid4
-import os
+from datetime import UTC, datetime
+from enum import Enum
 from hashlib import sha256
+from pathlib import Path
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -44,14 +41,28 @@ class Document(BaseModel):
     format: FileFormat = Field(..., description="Document file format")
     size_bytes: int = Field(..., description="File size in bytes")
     content_hash: str = Field(..., description="SHA256 hash of file content")
-    extracted_text: Optional[str] = Field(default=None, description="Raw extracted text content")
-    summary: Optional[str] = Field(default=None, description="Generated summary")
-    key_points: List[str] = Field(default_factory=list, description="Extracted key points")
-    processing_time_ms: Optional[int] = Field(default=None, description="Processing time in milliseconds")
-    state: ProcessingState = Field(default=ProcessingState.NEW, description="Current processing state")
-    error_message: Optional[str] = Field(default=None, description="Error message if processing failed")
-    created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
-    updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
+    extracted_text: str | None = Field(
+        default=None, description="Raw extracted text content",
+    )
+    summary: str | None = Field(default=None, description="Generated summary")
+    key_points: list[str] = Field(
+        default_factory=list, description="Extracted key points",
+    )
+    processing_time_ms: int | None = Field(
+        default=None, description="Processing time in milliseconds",
+    )
+    state: ProcessingState = Field(
+        default=ProcessingState.NEW, description="Current processing state",
+    )
+    error_message: str | None = Field(
+        default=None, description="Error message if processing failed",
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="Creation timestamp",
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.now, description="Last update timestamp",
+    )
 
     @field_validator("path")
     @classmethod
@@ -59,39 +70,38 @@ class Document(BaseModel):
         """Validate that the file path exists and is readable."""
         path = Path(v)
         if not path.exists():
-            raise ValueError(f"File does not exist: {v}")
+            msg = f"File does not exist: {v}"
+            raise ValueError(msg)
         if not path.is_file():
-            raise ValueError(f"Path is not a file: {v}")
+            msg = f"Path is not a file: {v}"
+            raise ValueError(msg)
         if not path.stat().st_size > 0:
-            raise ValueError(f"File is empty: {v}")
+            msg = f"File is empty: {v}"
+            raise ValueError(msg)
 
-        # Prevent path traversal / ensure file is inside workspace or system temp directory
+        # Prevent path traversal / ensure file is inside workspace or
+        # system temp directory
+        workspace_root = Path.cwd().resolve()
+        resolved = path.resolve()
+
+        # Allow files in workspace or system temp directory (cross-platform)
         try:
-            workspace_root = Path(os.getcwd()).resolve()
-            resolved = path.resolve()
-
-            # Allow files in workspace or system temp directory (cross-platform)
             is_in_workspace = resolved.is_relative_to(workspace_root)
-            system_temp = Path(tempfile.gettempdir()).resolve()
-            try:
-                resolved.relative_to(system_temp)
-                is_in_temp = True
-            except Exception:
-                is_in_temp = False
-
-            if not (is_in_workspace or is_in_temp):
-                raise ValueError(f"File path is outside of allowed workspace: {v}")
         except AttributeError:
-            # For Python versions without is_relative_to, fallback to manual check
-            workspace_root = str(Path(os.getcwd()).resolve())
-            resolved_str = str(path.resolve())
+            # Older Python versions may not have is_relative_to
+            is_in_workspace = str(resolved).startswith(str(workspace_root))
 
-            is_in_workspace = resolved_str.startswith(workspace_root)
-            system_temp = str(Path(tempfile.gettempdir()).resolve())
-            is_in_temp = resolved_str.startswith(system_temp)
+        system_temp = Path(tempfile.gettempdir()).resolve()
+        try:
+            resolved.relative_to(system_temp)
+            is_in_temp = True
+        except ValueError:
+            # Not relative to temp directory
+            is_in_temp = False
 
-            if not (is_in_workspace or is_in_temp):
-                raise ValueError(f"File path is outside of allowed workspace: {v}")
+        if not (is_in_workspace or is_in_temp):
+            msg = f"File path is outside of allowed workspace: {v}"
+            raise ValueError(msg)
 
         return str(path.absolute())
 
@@ -101,9 +111,11 @@ class Document(BaseModel):
         """Validate file size is within acceptable limits."""
         max_size = 100 * 1024 * 1024  # 100MB
         if v <= 0:
-            raise ValueError("File size must be greater than 0")
+            msg = "File size must be greater than 0"
+            raise ValueError(msg)
         if v > max_size:
-            raise ValueError(f"File size exceeds maximum limit of {max_size} bytes")
+            msg = f"File size exceeds maximum limit of {max_size} bytes"
+            raise ValueError(msg)
         return v
 
     @field_validator("format")
@@ -114,7 +126,10 @@ class Document(BaseModel):
             path = Path(info.data["path"])
             expected_format = path.suffix.lower().lstrip(".")
             if expected_format != v.value:
-                raise ValueError(f"Format {v.value} does not match file extension {expected_format}")
+                msg = (
+                    f"Format {v.value} does not match file extension {expected_format}"
+                )
+                raise ValueError(msg)
         return v
 
     @field_validator("content_hash")
@@ -122,11 +137,13 @@ class Document(BaseModel):
     def validate_hash(cls, v: str) -> str:
         """Validate content hash is valid SHA256."""
         if len(v) != 64:
-            raise ValueError("Content hash must be 64 characters (SHA256)")
+            msg = "Content hash must be 64 characters (SHA256)"
+            raise ValueError(msg)
         try:
             int(v, 16)
-        except ValueError:
-            raise ValueError("Content hash must be valid hexadecimal")
+        except ValueError as err:
+            msg = "Content hash must be valid hexadecimal"
+            raise ValueError(msg) from err
         return v
 
     @classmethod
@@ -154,8 +171,9 @@ class Document(BaseModel):
         extension = path.suffix.lower().lstrip(".")
         try:
             format_enum = FileFormat(extension)
-        except ValueError:
-            raise ValueError(f"Unsupported file format: {extension}")
+        except ValueError as err:
+            msg = f"Unsupported file format: {extension}"
+            raise ValueError(msg) from err
 
         return cls(
             path=str(path),
@@ -164,7 +182,11 @@ class Document(BaseModel):
             content_hash=content_hash,
         )
 
-    def update_state(self, new_state: ProcessingState, error_message: Optional[str] = None) -> None:
+    def update_state(
+        self,
+        new_state: ProcessingState,
+        error_message: str | None = None,
+    ) -> None:
         """Update the document's processing state.
 
         Args:
@@ -173,9 +195,14 @@ class Document(BaseModel):
         """
         self.state = new_state
         self.error_message = error_message
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(tz=UTC)
 
-    def set_summary(self, summary: str, key_points: List[str], processing_time_ms: int) -> None:
+    def set_summary(
+        self,
+        summary: str,
+        key_points: list[str],
+        processing_time_ms: int,
+    ) -> None:
         """Set the document's summary and related data.
 
         Args:
@@ -187,7 +214,7 @@ class Document(BaseModel):
         self.key_points = key_points
         self.processing_time_ms = processing_time_ms
         self.state = ProcessingState.COMPLETE
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(tz=UTC)
 
     def to_dict(self) -> dict:
         """Convert document to dictionary representation."""

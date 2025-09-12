@@ -14,7 +14,11 @@ class TestCliSummarizeMeetingContract:
         """Test basic meeting summarization command"""
         # This test will fail until the CLI is implemented
         test_file = Path("meeting_notes.txt")
-        test_file.write_text("Meeting notes: Discussed project timeline. Action items: John to update docs.")
+        notes_text = (
+            "Meeting notes: Discussed project timeline. Action items: "
+            "John to update docs."
+        )
+        test_file.write_text(notes_text)
 
         result = runner.invoke(app, ["summarize", "meeting", str(test_file)])
 
@@ -30,7 +34,15 @@ class TestCliSummarizeMeetingContract:
 
         result = runner.invoke(
             app,
-            ["summarize", "meeting", "--title", "Sprint Planning", "--date", "2025-09-09", str(test_file)],
+            [
+                "summarize",
+                "meeting",
+                "--title",
+                "Sprint Planning",
+                "--date",
+                "2025-09-09",
+                str(test_file),
+            ],
         )
 
         assert result.exit_code == 0
@@ -39,12 +51,22 @@ class TestCliSummarizeMeetingContract:
     def test_summarize_meeting_save_output(self):
         """Test saving meeting summary to file"""
         test_file = Path("meeting_notes.txt")
-        test_file.write_text("Content to be summarized and saved as meeting notes.")
+        save_text = "Content to be summarized and saved as meeting notes."
+        test_file.write_text(save_text)
 
         output_file = Path("meeting_summary.json")
         result = runner.invoke(
             app,
-            ["summarize", "meeting", "--save", "--format", "json", "--output", str(output_file), str(test_file)],
+            [
+                "summarize",
+                "meeting",
+                "--save",
+                "--format",
+                "json",
+                "--output",
+                str(output_file),
+                str(test_file),
+            ],
         )
 
         assert result.exit_code == 0
@@ -67,7 +89,8 @@ class TestCliSummarizeMeetingContract:
         result = runner.invoke(app, ["summarize", "meeting", str(test_file)])
 
         assert result.exit_code == 2
-        assert "unsupported" in result.output.lower() or "format" in result.output.lower()
+        out = result.output.lower()
+        assert "unsupported" in out or "format" in out
 
         # Clean up
         test_file.unlink(missing_ok=True)
@@ -75,7 +98,8 @@ class TestCliSummarizeMeetingContract:
     def test_summarize_meeting_with_provider(self):
         """Test meeting summarization with specific AI provider"""
         test_file = Path("meeting_notes.txt")
-        test_file.write_text("Meeting content for provider testing.")
+        prov_text = "Meeting content for provider testing."
+        test_file.write_text(prov_text)
 
         result = runner.invoke(
             app, ["summarize", "meeting", "--provider", "openai", str(test_file)],

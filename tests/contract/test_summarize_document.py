@@ -68,17 +68,22 @@ class TestSummarizeDocumentContract:
         # Missing required fields
         response = client.post("/summarize/document", json={})
 
-        assert response.status_code in [HTTP_400_BAD_REQUEST, HTTP_422_UNPROCESSABLE_ENTITY]
+        # Accept either 400 or 422 for invalid request
+        assert response.status_code in [
+            HTTP_400_BAD_REQUEST,
+            HTTP_422_UNPROCESSABLE_ENTITY,
+        ]
         data = response.json()
-        assert "error" in data
-        assert "error_code" in data
+        out = data
+        assert "error" in out
+        assert "error_code" in out
 
     def test_summarize_document_unsupported_format(self):
         """Test handling of unsupported file formats"""
-        # This would test file validation, but since endpoint doesn't exist, it will fail
-        # Placeholder for future implementation
+    # This would test file validation, but since endpoint doesn't exist,
+    # it will fail (placeholder for future implementation)
 
     def test_summarize_document_file_too_large(self):
         """Test handling of files that are too large"""
-        # This would test file size limits, but since endpoint doesn't exist, it will fail
-        # Placeholder for future implementation
+    # This would test file size limits, but since endpoint doesn't exist,
+    # it will fail (placeholder for future implementation)
