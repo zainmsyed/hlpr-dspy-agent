@@ -70,21 +70,21 @@ def accounts_test(account_id: str) -> NoReturn:
 
 @app.command("process")
 def process_emails(
-    account_id: str = typer.Argument(None),
+    account_id: str = typer.Argument(..., help="Account ID to process"),
     mailbox: str | None = typer.Option(None, "--mailbox"),
     *,
-    unread_only: bool = typer.Option(
-        default=False,
-        help="Process only unread emails",
-    ),
+    unread_only: bool = typer.Option(default=False, help="Only unread"),
     limit: int | None = typer.Option(None, "--limit"),
     output_options: str = typer.Option(
-        "txt:",
-        "--output",
-        help="Output format:path (e.g., txt:file.txt)",
+        "txt:", "--output", help="Output format:path (e.g., txt:file.txt)",
     ),
 ) -> NoReturn:
     """Process emails from specified account."""
+    # Validate account exists (in-memory store used by accounts commands)
+    if account_id not in _accounts:
+        console.print("Account not found")
+        raise typer.Exit(1)
+
     # Parse output_options to extract format and path
     if ":" in output_options:
         output_format, output_path = output_options.split(":", 1)
@@ -92,9 +92,14 @@ def process_emails(
         output_format = output_options
         output_path = None
 
+    # Basic echo of parameters
     console.print(f"Processing emails for account: {account_id}")
     console.print(f"Mailbox: {mailbox or 'ALL'}")
     console.print(f"Unread only: {unread_only}")
     console.print(f"Limit: {limit or 'No limit'}")
     console.print(f"Output format: {output_format}")
     console.print(f"Output path: {output_path or 'Console'}")
+
+    # For now, fail since no real IMAP configured
+    console.print("Error: IMAP not configured")
+    raise typer.Exit(2)

@@ -1,0 +1,10 @@
+{
+  "file": "output-meeting.txt",
+  "format": "txt",
+  "size_bytes": 115,
+  "summary": "Product roadmap discussion. Priorities set for next quarter. Engineering team to focus on performance improvements.",
+  "key_points": [
+    "Discussion points noted"
+  ],
+  "processing_time_ms": 0
+}

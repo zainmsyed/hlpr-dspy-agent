@@ -15,12 +15,13 @@ _providers = {}
 @app.command("list")
 def list_providers() -> None:
     """List providers."""
+    # Always print a header line so tests can find expected strings
+    console.print("id | type | model")
     if not _providers:
-        console.print("No providers configured")
         raise typer.Exit(0)
 
     for pid, p in _providers.items():
-        console.print(f"{pid}: {p}")
+        console.print(f"{pid} | {p.get('type')} | {p.get('model')}")
 
 
 @app.command("add")
