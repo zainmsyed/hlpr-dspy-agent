@@ -4,6 +4,7 @@ This module provides DSPy-based summarization capabilities with support for
 multiple LLM providers and automatic prompt optimization.
 """
 
+import contextlib
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -263,19 +264,16 @@ class DSPyDocumentSummarizer:
                 # (model-not-found, invalid-config). If we don't get a result
                 # within the short window, cancel and abort quickly instead of
                 # waiting the full timeout which is undesirable for local use.
-                FAST_FAIL_SECONDS = 1.0
+                fast_fail_seconds = 1.0
                 try:
-                    result = future.result(timeout=FAST_FAIL_SECONDS)
+                    result = future.result(timeout=fast_fail_seconds)
                 except FutureTimeoutError:
                     # No immediate response; attempt to get final result but
                     # don't block the caller for the full timeout. Try to
                     # cancel the future and raise so callers can handle
                     # non-responsive LLMs deterministically.
-                    try:
+                    with contextlib.suppress(Exception):
                         future.cancel()
-                    except Exception:
-                        # Best-effort cancel; continue to raise
-                        pass
 
                     processing_time_ms = int((time.time() - start_time) * 1000)
                     msg = (
@@ -283,7 +281,7 @@ class DSPyDocumentSummarizer:
                         "aborting to avoid long waits (fast-fail)."
                     )
                     logger.warning(msg)
-                    raise RuntimeError(msg)
+                    raise RuntimeError(msg) from None
 
             # Ensure key_points is a list
             key_points = result.key_points

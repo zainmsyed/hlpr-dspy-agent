@@ -1,5 +1,5 @@
-import io
-import json
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from hlpr.api.main import app
@@ -8,7 +8,7 @@ from hlpr.api.main import app
 def test_summarize_document_demo():
     client = TestClient(app)
 
-    with open("test_document.txt", "rb") as f:
+    with Path("test_document.txt").open("rb") as f:
         files = {"file": ("test_document.txt", f, "text/plain")}
         resp = client.post("/summarize/document", files=files)
 
@@ -17,4 +17,5 @@ def test_summarize_document_demo():
     assert "summary" in body
     assert "key_points" in body
     # Ensure either DSPy result or fallback present
-    assert isinstance(body["summary"], str) and len(body["summary"]) > 0
+    assert isinstance(body["summary"], str)
+    assert len(body["summary"]) > 0

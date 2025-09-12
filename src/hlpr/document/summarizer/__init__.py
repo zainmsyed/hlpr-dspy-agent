@@ -111,7 +111,11 @@ class DocumentSummarizer:
 
         try:
             # Use DSPy summarizer
-            with ProgressContext(self.progress_tracker, ProcessingPhase.SUMMARIZING, items_total=1) as metrics:
+            with ProgressContext(
+                self.progress_tracker,
+                ProcessingPhase.SUMMARIZING,
+                items_total=1,
+            ) as metrics:
                 dspy_result = self.dspy_summarizer.summarize(document.extracted_text)
                 metrics.items_processed = 1
 

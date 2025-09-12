@@ -33,11 +33,11 @@ def main():
     logger.info("Calling DSPy summarizer...")
     try:
         result = summarizer.summarize_document(doc)
-    except Exception as e:
+    except Exception:
         logger.exception("DSPy summarization failed")
         # Try fallback deterministic summarizer
         logger.info("Falling back to the local summarizer...")
-        result = summarizer._fallback_summarize(doc.extracted_text)
+        result = summarizer.summarize_text(doc.extracted_text)
 
     payload = {
         "summary": result.summary,
@@ -46,7 +46,7 @@ def main():
         "total_time_ms": int((time.time() - start) * 1000),
     }
 
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
