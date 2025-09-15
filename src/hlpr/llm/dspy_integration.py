@@ -56,7 +56,7 @@ class DSPyDocumentSummarizer:
         api_base: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 8192,
-        temperature: float = 0.3,
+        temperature: float = 0.0,
         timeout: int = 30,
         fast_fail_seconds: float | None = 1.0,
     ):

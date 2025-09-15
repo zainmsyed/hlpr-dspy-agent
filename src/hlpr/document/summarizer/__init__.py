@@ -409,14 +409,15 @@ class DocumentSummarizer:
         that emits evidence and model confidence scores.
         """
         results: list[dict] = []
-        try:
-            def tokenize(s: str) -> list[str]:
-                return re.findall(r"\w+", s.lower())
 
-            source_tokens = set(tokenize(source_text))
+        def _tokenize(s: str) -> list[str]:
+            return re.findall(r"\w+", s.lower())
+
+        try:
+            source_tokens = set(_tokenize(source_text))
 
             for sent in hallucinations:
-                sent_tokens = tokenize(sent)
+                sent_tokens = _tokenize(sent)
                 if not sent_tokens:
                     results.append(
                         {
@@ -443,6 +444,31 @@ class DocumentSummarizer:
                         "supporting_tokens": list(sent_set & source_tokens),
                     },
                 )
+
+            # If a DSPy-based verifier is available and verification was
+            # requested, call it and merge model results into the output.
+            if self.verify_hallucinations_flag and self.dspy_summarizer is not None:
+                try:
+                    model_results = self.dspy_summarizer.verify_claims(
+                        source_text,
+                        [r["sentence"] for r in results],
+                    )
+                    # Map model results by claim text for quick lookup
+                    model_map = {m["claim"]: m for m in model_results}
+
+                    for r in results:
+                        m = model_map.get(r["sentence"], {})
+                        r["model_supported"] = m.get("model_supported")
+                        r["model_confidence"] = m.get("model_confidence")
+                        r["model_evidence"] = m.get("model_evidence")
+                except Exception:  # pragma: no cover - don't fail verification
+                    logger.exception("Model-backed hallucination verification failed")
+                    for r in results:
+                        r["model_supported"] = None
+                        r["model_confidence"] = None
+                        r["model_evidence"] = ""
+
+        # end try
         except Exception:  # pragma: no cover - failing safely
             logger.exception("Hallucination verification failed")
             return []

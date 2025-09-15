@@ -33,6 +33,9 @@ class SummarizeTextRequest(BaseModel):
     provider_id: str | None = Field(
         "local", description="AI provider to use",
     )
+    temperature: float | None = Field(
+        None, description="Sampling temperature for the model (0.0-1.0)",
+    )
     format: str | None = Field(
         "json", description="Output format", pattern="^(txt|md|json)$",
     )
@@ -72,6 +75,7 @@ def _process_file_upload(
     filename: str,
     file_content: bytes,
     provider_id: str | None,
+    temperature: float | None,
     start_time: float,
 ) -> DocumentSummaryResponse:
     """Handle uploaded file processing and summarization."""
@@ -132,8 +136,11 @@ def _process_file_upload(
         document = Document.from_file(str(temp_file_path))
         document.extracted_text = extracted_text
 
-        # Initialize summarizer
-        summarizer = DocumentSummarizer(provider=provider_id or "local")
+        # Initialize summarizer (respect optional temperature)
+        summarizer = DocumentSummarizer(
+            provider=provider_id or "local",
+            temperature=temperature if temperature is not None else 0.3,
+        )
 
         # Generate summary
         if len(extracted_text) > 8192:
@@ -169,6 +176,7 @@ def _process_text_request(
     text_content: str,
     title: str | None,
     provider: str,
+    temperature: float | None,
     start_time: float,
 ) -> DocumentSummaryResponse:
     """Handle raw text summarization path."""
@@ -196,7 +204,10 @@ def _process_text_request(
             ),
         )
 
-    summarizer = DocumentSummarizer(provider=provider)
+    summarizer = DocumentSummarizer(
+        provider=provider,
+        temperature=temperature if temperature is not None else 0.3,
+    )
     result = summarizer.summarize_text(text_content, title)
 
     word_count = len(text_content.split())
@@ -226,6 +237,7 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
     file: UploadFile | None = None,
     provider_id: str | None = None,
     format_param: str | None = "json",
+    temperature: float | None = None,
 ) -> DocumentSummaryResponse:
     """Summarize a document from file upload.
 
@@ -270,6 +282,7 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
                 filename=file.filename,
                 file_content=file_content,
                 provider_id=provider_id,
+                temperature=temperature,
                 start_time=start_time,
             )
             # Respect requested format param
@@ -312,11 +325,14 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
         title = body.get("title")
         provider = body.get("provider_id") or provider_id or "local"
         resp_format = body.get("format") or format_param or "json"
+        # Allow request body to include temperature as an override
+        body_temp = body.get("temperature")
 
         resp = _process_text_request(
             text_content=text_content,
             title=title,
             provider=provider,
+            temperature=body_temp,
             start_time=start_time,
         )
         resp.format = resp_format
@@ -361,6 +377,7 @@ async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryRespon
             text_content=request.text_content,
             title=request.title,
             provider=request.provider_id or "local",
+            temperature=request.temperature,
             start_time=start_time,
         )
         # Respect requested response format; fall through to return in else

@@ -71,6 +71,11 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         "--model",
         help="Model name to use (e.g., gemma3:latest)",
     ),
+    temperature: float = typer.Option(
+        0.3,
+        "--temperature",
+        help="Sampling temperature for the model (0.0-1.0)",
+    ),
     dspy_timeout: int = typer.Option(
         30,
         "--dspy-timeout",
@@ -103,6 +108,7 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         summarizer = DocumentSummarizer(
             provider=provider,
             model=model,
+            temperature=temperature,
             api_base=None,
             api_key=None,
             timeout=dspy_timeout,
