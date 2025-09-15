@@ -17,8 +17,9 @@
 - Multi-provider LLM support (local, OpenAI, Anthropic, Groq, Together AI)
 - Security hardening: path validation, streaming processing, thread safety
 
-**Next Phase: 3.5 Polish**
-- T018-T021: Unit tests, performance, documentation, quickstart updatesDesign documents from `/home/zain/Documents/coding/hlpr/specs/002-document-article-summarization/`
+**Next Phase: 3.5 Polish (IN PROGRESS)**
+T018-T023: Unit tests, performance, documentation, quickstart, hallucination mitigation, verification
+Design documents from `/home/zain/Documents/coding/hlpr/specs/002-document-article-summarization/`
 **Prerequisites**: plan.md ✓, research.md ✓, data-model.md ✓, contracts/ ✓, quickstart.md ✓
 
 ## Execution Flow (main)
@@ -111,11 +112,13 @@ Single project structure per plan.md:
 - [x] **T016** Progress tracking for document processing
 - [x] **T017** LLM provider integration (local/cloud) for documents
 
-## Phase 3.5: Polish
-- [ ] **T018** [P] Unit tests for document parsing in tests/unit/test_document_parser.py
-- [ ] **T019** Performance tests for document processing (<2s target)
+## Phase 3.5: Polish (IN PROGRESS)
+- [x] **T018** [P] Unit tests for document parsing in tests/unit/test_document_parser.py
+- [x] **T019** Performance tests for document processing (<2s target)
+- [x] **T022** Hallucination mitigation (basic detector + CLI warnings)
 - [ ] **T020** [P] Document processing documentation in docs/document-processing.md
 - [ ] **T021** Update quickstart guide with document examples
+- [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
 
 ## Dependencies
 - Tests (T004-T006) before implementation (T007-T013)

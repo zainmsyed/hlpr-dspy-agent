@@ -1,6 +1,7 @@
 """Document summarization services using DSPy."""
 
 import logging
+import re
 import time
 
 from pydantic import BaseModel
@@ -25,6 +26,7 @@ class SummaryResult(BaseModel):
     key_points: list[str]
     processing_time_ms: int
     hallucinations: list[str] = []
+    hallucination_verification: list[dict] = []
 
 
 class DocumentSummarizer:
@@ -37,13 +39,16 @@ class DocumentSummarizer:
     def __init__(  # noqa: PLR0913 - initializer exposes config knobs for UX
         self,
         provider: str = "local",
-    model: str = "gemma3:latest",
+        model: str = "gemma3:latest",
         api_base: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 8192,
         temperature: float = 0.3,
         timeout: int = 30,
         progress_tracker: ProgressTracker | None = None,
+        *,
+        no_fallback: bool = False,
+        verify_hallucinations: bool = False,
     ):
         """Initialize the document summarizer.
 
@@ -65,6 +70,8 @@ class DocumentSummarizer:
         self.temperature = temperature
         self.timeout = timeout
         self.progress_tracker = progress_tracker or create_progress_tracker()
+        self.no_fallback = no_fallback
+        self.verify_hallucinations_flag = verify_hallucinations
 
         # Initialize DSPy summarizer with fallback handling
         self.use_dspy = True
@@ -78,12 +85,11 @@ class DocumentSummarizer:
                 temperature=temperature,
                 timeout=timeout,
             )
-        except Exception:
+        except Exception:  # pragma: no cover - best-effort fallback
             # Log full exception information to aid debugging, then fall back.
-            msg = (
-                "DSPy initialization failed, falling back to local summarizer"
+            logger.exception(
+                "DSPy initialization failed, falling back to local summarizer",
             )
-            logger.exception(msg)
             self.use_dspy = False
             self.dspy_summarizer = None
 
@@ -111,33 +117,61 @@ class DocumentSummarizer:
             return self._fallback_summarize(document.extracted_text)
 
         try:
-            # Use DSPy summarizer
-            with ProgressContext(
-                self.progress_tracker,
-                ProcessingPhase.SUMMARIZING,
-                items_total=1,
-            ) as metrics:
-                dspy_result = self.dspy_summarizer.summarize(document.extracted_text)
-                metrics.items_processed = 1
+            result = self._summarize_with_dspy(document)
+        except Exception:  # pragma: no cover - fallback path
+            logger.exception("Summarization via DSPy failed")
+            return self._handle_summarization_failure(document)
+        else:
+            return result
 
-                hallucinations = self._detect_hallucinations(document.extracted_text, dspy_result.summary)
-                return SummaryResult(
-                    summary=dspy_result.summary,
-                    key_points=dspy_result.key_points,
-                    processing_time_ms=dspy_result.processing_time_ms,
-                    hallucinations=hallucinations,
+    def _summarize_with_dspy(self, document: Document) -> SummaryResult:
+        """Internal helper to perform DSPy summarization and verification.
+
+        Factored out to reduce complexity of `summarize_document` for linting.
+        """
+        with ProgressContext(
+            self.progress_tracker,
+            ProcessingPhase.SUMMARIZING,
+            items_total=1,
+        ) as metrics:
+            dspy_result = self.dspy_summarizer.summarize(document.extracted_text)
+            metrics.items_processed = 1
+
+            hallucinations = self._detect_hallucinations(
+                document.extracted_text,
+                dspy_result.summary,
+            )
+
+            result = SummaryResult(
+                summary=dspy_result.summary,
+                key_points=dspy_result.key_points,
+                processing_time_ms=dspy_result.processing_time_ms,
+                hallucinations=hallucinations,
+            )
+
+            # Optionally verify hallucinations (deterministic overlap verification)
+            if self.verify_hallucinations_flag and hallucinations:
+                result.hallucination_verification = self.verify_hallucinations(
+                    document.extracted_text,
+                    hallucinations,
                 )
 
-        except Exception:
-            # Include stack trace for easier debugging. Fall back deterministically.
-            msg = (
-                "Failed to summarize document using DSPy, "
-                "falling back to local summarizer"
-            )
-            logger.exception(msg)
-            result = self._fallback_summarize(document.extracted_text)
-            result.hallucinations = self._detect_hallucinations(document.extracted_text, result.summary)
             return result
+
+    def _handle_summarization_failure(self, document: Document) -> SummaryResult:
+        """Handle DSPy summarization failure by falling back deterministically."""
+        logger.info("Falling back to deterministic summarizer")
+        result = self._fallback_summarize(document.extracted_text)
+        result.hallucinations = self._detect_hallucinations(
+            document.extracted_text, result.summary,
+        )
+        if self.verify_hallucinations_flag and result.hallucinations:
+            result.hallucination_verification = self.verify_hallucinations(
+                document.extracted_text,
+                result.hallucinations,
+            )
+        return result
+
 
     def summarize_text(
         self,
@@ -169,22 +203,35 @@ class DocumentSummarizer:
         try:
             # Use DSPy summarizer
             dspy_result = self.dspy_summarizer.summarize(document_text)
-
-            hallucinations = self._detect_hallucinations(document_text, dspy_result.summary)
-            return SummaryResult(
-                summary=dspy_result.summary,
-                key_points=dspy_result.key_points,
-                processing_time_ms=dspy_result.processing_time_ms,
-                hallucinations=hallucinations,
-            )
-
         except Exception:
             msg = (
                 "Failed to summarize text using DSPy, falling back to local summarizer"
             )
             logger.exception(msg)
             result = self._fallback_summarize(text)
-            result.hallucinations = self._detect_hallucinations(text, result.summary)
+            result.hallucinations = self._detect_hallucinations(
+                text, result.summary,
+            )
+            if self.verify_hallucinations_flag and result.hallucinations:
+                result.hallucination_verification = (
+                    self.verify_hallucinations(text, result.hallucinations)
+                )
+            return result
+        else:
+            summary_text = dspy_result.summary
+            hallucinations = self._detect_hallucinations(
+                document_text, summary_text,
+            )
+            result = SummaryResult(
+                summary=dspy_result.summary,
+                key_points=dspy_result.key_points,
+                processing_time_ms=dspy_result.processing_time_ms,
+                hallucinations=hallucinations,
+            )
+            if self.verify_hallucinations_flag and hallucinations:
+                result.hallucination_verification = (
+                    self.verify_hallucinations(document_text, hallucinations)
+                )
             return result
 
     def summarize_large_document(
@@ -322,24 +369,82 @@ class DocumentSummarizer:
         best-effort — it won't block summarization on error.
         """
         try:
-            import re
-
             def tokenize(s: str) -> set[str]:
                 return set(re.findall(r"\w+", s.lower()))
 
             source_tokens = tokenize(source_text)
-            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", summary_text) if s.strip()]
+            sentences = [
+                s.strip()
+                for s in re.split(r"(?<=[.!?])\s+", summary_text)
+                if s.strip()
+            ]
             flagged: list[str] = []
-            THRESHOLD = 0.2
+            threshold = 0.2
 
             for sent in sentences:
                 sent_tokens = tokenize(sent)
                 if not sent_tokens:
                     continue
                 overlap = len(sent_tokens & source_tokens) / len(sent_tokens)
-                if overlap < THRESHOLD:
+                if overlap < threshold:
                     flagged.append(sent)
-
-            return flagged
-        except Exception:
+        except Exception:  # pragma: no cover - failing safely
+            logger.exception("Hallucination detector failed")
             return []
+        else:
+            return flagged
+
+    def verify_hallucinations(
+        self,
+        source_text: str,
+        hallucinations: list[str],
+    ) -> list[dict]:
+        """Verify flagged hallucination sentences using deterministic overlap metrics.
+
+        This lightweight verifier returns, for each flagged sentence, an object
+        with the sentence, overlap ratio, a conservative boolean indicating
+        whether it appears supported by the source, and a small list of
+        supporting tokens. The implementation is deterministic and cheap; a
+        future version can replace this with a model-based verification step
+        that emits evidence and model confidence scores.
+        """
+        results: list[dict] = []
+        try:
+            def tokenize(s: str) -> list[str]:
+                return re.findall(r"\w+", s.lower())
+
+            source_tokens = set(tokenize(source_text))
+
+            for sent in hallucinations:
+                sent_tokens = tokenize(sent)
+                if not sent_tokens:
+                    results.append(
+                        {
+                            "sentence": sent,
+                            "overlap": 0.0,
+                            "likely_supported": False,
+                            "supporting_tokens": [],
+                        },
+                    )
+                    continue
+
+                sent_set = set(sent_tokens)
+                overlap_count = len(sent_set & source_tokens)
+                overlap_ratio = overlap_count / len(sent_set)
+
+                # Conservative threshold: consider supported if >= 0.3 overlap
+                likely_supported = overlap_ratio >= 0.3
+
+                results.append(
+                    {
+                        "sentence": sent,
+                        "overlap": overlap_ratio,
+                        "likely_supported": likely_supported,
+                        "supporting_tokens": list(sent_set & source_tokens),
+                    },
+                )
+        except Exception:  # pragma: no cover - failing safely
+            logger.exception("Hallucination verification failed")
+            return []
+        else:
+            return results

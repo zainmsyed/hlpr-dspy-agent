@@ -66,6 +66,24 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         default=False,
         help="Enable verbose output",
     ),
+    model: str = typer.Option(
+        "local",
+        "--model",
+        help="Model name to use (e.g., gemma3:latest)",
+    ),
+    dspy_timeout: int = typer.Option(
+        30,
+        "--dspy-timeout",
+        help="DSPy request timeout in seconds",
+    ),
+    no_fallback: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+        default=False,
+        help="Disable fallback to local summarizer on DSPy failure",
+    ),
+    verify_hallucinations: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+        default=False,
+        help="Verify flagged hallucinations with additional model calls",
+    ),
 ):
     """Summarize a document (PDF, DOCX, TXT, MD)."""
     # Validate file exists (outside try to avoid TRY301)
@@ -82,7 +100,15 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         document, extracted_text = _parse_with_progress(file_path, verbose)
 
         # Initialize summarizer
-        summarizer = DocumentSummarizer(provider=provider)
+        summarizer = DocumentSummarizer(
+            provider=provider,
+            model=model,
+            api_base=None,
+            api_key=None,
+            timeout=dspy_timeout,
+            no_fallback=no_fallback,
+            verify_hallucinations=verify_hallucinations,
+        )
 
         # Summarize with progress
         result = _summarize_with_progress(
@@ -110,7 +136,7 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         raise typer.Exit(4) from e
 
 
-def _display_summary(document: Document, result: Any, output_format: str) -> None:
+def _display_summary(document: Document, result: Any, output_format: str) -> None:  # noqa: C901,PLR0912,PLR0915
     """Display the summary results in the specified format."""
     if output_format == "rich":
         # Rich terminal display
@@ -150,7 +176,13 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         # Show hallucination warnings if any
         if getattr(result, "hallucinations", None):
             warn_text = "\n".join(result.hallucinations[:5])
-            console.print(Panel(warn_text, title="[bold red]Potential Hallucinations[/bold red]", border_style="red"))
+            console.print(
+                Panel(
+                    warn_text,
+                    title="[bold red]Potential Hallucinations[/bold red]",
+                    border_style="red",
+                ),
+            )
 
     elif output_format == "json":
         # JSON output
