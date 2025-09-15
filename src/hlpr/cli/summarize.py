@@ -67,7 +67,7 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         help="Enable verbose output",
     ),
     model: str = typer.Option(
-        "local",
+        "gemma3:latest",
         "--model",
         help="Model name to use (e.g., gemma3:latest)",
     ),
