@@ -1,8 +1,0 @@
-Team Meeting - Action Items Discussion
-
-John will update the documentation by Friday.
-Sarah needs to review the pull request before EOD.
-Mike should schedule a meeting with the client next week.
-Lisa will prepare the presentation for the board meeting.
-
-Follow-up meeting scheduled for next Tuesday.

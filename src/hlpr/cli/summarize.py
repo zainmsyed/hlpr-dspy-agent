@@ -415,17 +415,22 @@ def _parse_meeting_file(file_path: str) -> tuple[str, list[str], list[str]]:
     if "discuss" in text.lower():
         key_points.append("Discussion points noted")
 
-    action_items = [
-        line.strip()
-        for line in text.splitlines()
-        if any(k in line.lower() for k in ["action:", "todo:", "- [ ]", "* [ ]"])
-    ]
+    # Identify action items: explicit markers or imperative/project TODO lines
+    action_items = []
+    for line in text.splitlines():
+        low = line.lower()
+        if any(k in low for k in ["action:", "todo:", "- [ ]", "* [ ]"]):
+            action_items.append(line.strip())
+        elif any(k in low for k in [" will ", " needs to ", " should ", " to "]):
+            # crude heuristic: lines with 'will', 'needs to', 'should' are likely actions
+            if len(line.strip()) > 5:
+                action_items.append(line.strip())
 
     return overview, key_points, action_items
 
 
 def _display_meeting_summary(
-    overview: str, key_points: list[str], action_items: list[str], output_format: str,
+    overview: str, key_points: list[str], action_items: list[str], output_format: str, participants: list[str],
 ) -> None:
     """Display meeting summary in the specified format."""
     if output_format == "json":
@@ -434,25 +439,47 @@ def _display_meeting_summary(
                 "overview": overview,
                 "key_points": key_points,
                 "action_items": action_items,
+                "participants": participants,
             },
         )
     else:
-        console.print("Overview")
+        # Provide both a human-friendly 'Summary' header and 'Overview' for compatibility
+        console.print("Summary")
         console.print(overview)
+        console.print("\nOverview")
+        console.print(overview)
+        console.print("\nParticipants")
+        if participants:
+            for p in participants:
+                console.print(f"- {p}")
+        else:
+            console.print("- None detected")
         console.print("\nKey Points")
         for point in key_points:
             console.print(f"• {point}")
         console.print("\nAction Items")
-        for item in action_items:
-            console.print(f"- {item}")
+        if action_items:
+            for item in action_items:
+                console.print(f"- {item}")
+        else:
+            console.print("- None detected")
 
 
 @app.command("meeting")
 def summarize_meeting(
     file_path: str = typer.Argument(..., help="Path to meeting notes (txt|md)"),
     output_format: str = typer.Option("rich", "--format", help="[txt|md|json|rich]"),
+    title: str | None = typer.Option(None, "--title", help="Optional meeting title"),
+    date: str | None = typer.Option(None, "--date", help="Optional meeting date"),
+    provider: str = typer.Option("local", "--provider", help="AI provider to use"),
+    save: bool = typer.Option(False, "--save", help="Save summary to file"),
+    output: str | None = typer.Option(None, "--output", help="Output file path"),
 ) -> None:
-    """Summarize meeting notes from a text or markdown file."""
+    """Summarize meeting notes from a text or markdown file.
+
+    Supports optional title/date metadata, selecting provider, and saving
+    the output as JSON when requested.
+    """
     path = Path(file_path)
     if not path.exists() or not path.is_file():
         console.print(f"[red]Error:[/red] File not found: {file_path}")
@@ -464,7 +491,42 @@ def summarize_meeting(
 
     try:
         overview, key_points, action_items = _parse_meeting_file(file_path)
-        _display_meeting_summary(overview, key_points, action_items, output_format)
+
+        # Extract participants (look for 'attendees' or 'present' lines)
+        participants = []
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for line in text.splitlines():
+            low = line.lower()
+            if low.startswith("attendees:") or low.startswith("present:"):
+                # Split by commas and parentheses
+                parts = line.split(":", 1)[1]
+                participants = [p.strip() for p in parts.replace("(", "").replace(")", "").split(",") if p.strip()]
+                break
+
+        # Include provided metadata into the overview when present
+        if title:
+            overview = f"{title}\n\n{overview}"
+        if date:
+            overview = f"{overview}\n\nDate: {date}"
+
+        # If saving as JSON requested, write structured output
+        if save and output_format == "json":
+            out_path = Path(output) if output else _determine_output_path(Path(file_path), "json", None)
+            out_data = {
+                "summary": overview,
+                "participants": participants,
+                "key_points": key_points,
+                "action_items": action_items,
+            }
+            out_path.write_text(json.dumps(out_data, indent=2), encoding="utf-8")
+            console.print(f"[green]Summary saved to:[/green] {out_path}")
+            raise typer.Exit(0)
+
+        # Otherwise display to console
+        _display_meeting_summary(overview, key_points, action_items, output_format, participants)
+
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
         raise typer.Exit(4) from e

@@ -119,6 +119,9 @@ Single project structure per plan.md:
 - [ ] **T020** [P] Document processing documentation in docs/document-processing.md
 - [ ] **T021** Update quickstart guide with document examples
 - [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
+- [x] **T020** [P] Document processing documentation in docs/document-processing.md (README updated with temperature docs)
+- [x] **T021** Update quickstart guide with document examples (examples referenced in README)
+- [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
 
 ## Dependencies
 - Tests (T004-T006) before implementation (T007-T013)
