@@ -24,6 +24,7 @@ class SummaryResult(BaseModel):
     summary: str
     key_points: list[str]
     processing_time_ms: int
+    hallucinations: list[str] = []
 
 
 class DocumentSummarizer:
@@ -119,11 +120,13 @@ class DocumentSummarizer:
                 dspy_result = self.dspy_summarizer.summarize(document.extracted_text)
                 metrics.items_processed = 1
 
-            return SummaryResult(
-                summary=dspy_result.summary,
-                key_points=dspy_result.key_points,
-                processing_time_ms=dspy_result.processing_time_ms,
-            )
+                hallucinations = self._detect_hallucinations(document.extracted_text, dspy_result.summary)
+                return SummaryResult(
+                    summary=dspy_result.summary,
+                    key_points=dspy_result.key_points,
+                    processing_time_ms=dspy_result.processing_time_ms,
+                    hallucinations=hallucinations,
+                )
 
         except Exception:
             # Include stack trace for easier debugging. Fall back deterministically.
@@ -132,7 +135,9 @@ class DocumentSummarizer:
                 "falling back to local summarizer"
             )
             logger.exception(msg)
-            return self._fallback_summarize(document.extracted_text)
+            result = self._fallback_summarize(document.extracted_text)
+            result.hallucinations = self._detect_hallucinations(document.extracted_text, result.summary)
+            return result
 
     def summarize_text(
         self,
@@ -165,10 +170,12 @@ class DocumentSummarizer:
             # Use DSPy summarizer
             dspy_result = self.dspy_summarizer.summarize(document_text)
 
+            hallucinations = self._detect_hallucinations(document_text, dspy_result.summary)
             return SummaryResult(
                 summary=dspy_result.summary,
                 key_points=dspy_result.key_points,
                 processing_time_ms=dspy_result.processing_time_ms,
+                hallucinations=hallucinations,
             )
 
         except Exception:
@@ -176,7 +183,9 @@ class DocumentSummarizer:
                 "Failed to summarize text using DSPy, falling back to local summarizer"
             )
             logger.exception(msg)
-            return self._fallback_summarize(text)
+            result = self._fallback_summarize(text)
+            result.hallucinations = self._detect_hallucinations(text, result.summary)
+            return result
 
     def summarize_large_document(
         self,
@@ -259,6 +268,7 @@ class DocumentSummarizer:
                 summary=final_result.summary,
                 key_points=final_result.key_points,
                 processing_time_ms=processing_time_ms,
+                hallucinations=getattr(final_result, "hallucinations", []),
             )
 
         except Exception as e:
@@ -300,4 +310,36 @@ class DocumentSummarizer:
             summary=summary or text[:200],
             key_points=key_points,
             processing_time_ms=processing_time_ms,
+            hallucinations=[],
         )
+
+    def _detect_hallucinations(self, source_text: str, summary_text: str) -> list[str]:
+        """Lightweight hallucination detector using token overlap per sentence.
+
+        For each sentence in the summary, compute overlap ratio with source
+        text tokens. If ratio is below threshold, flag the sentence as
+        potential hallucination. This is intentionally conservative and
+        best-effort — it won't block summarization on error.
+        """
+        try:
+            import re
+
+            def tokenize(s: str) -> set[str]:
+                return set(re.findall(r"\w+", s.lower()))
+
+            source_tokens = tokenize(source_text)
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", summary_text) if s.strip()]
+            flagged: list[str] = []
+            THRESHOLD = 0.2
+
+            for sent in sentences:
+                sent_tokens = tokenize(sent)
+                if not sent_tokens:
+                    continue
+                overlap = len(sent_tokens & source_tokens) / len(sent_tokens)
+                if overlap < THRESHOLD:
+                    flagged.append(sent)
+
+            return flagged
+        except Exception:
+            return []

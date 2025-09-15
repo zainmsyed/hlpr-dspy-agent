@@ -147,6 +147,11 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         )
         console.print(metadata_panel)
 
+        # Show hallucination warnings if any
+        if getattr(result, "hallucinations", None):
+            warn_text = "\n".join(result.hallucinations[:5])
+            console.print(Panel(warn_text, title="[bold red]Potential Hallucinations[/bold red]", border_style="red"))
+
     elif output_format == "json":
         # JSON output
         output_data = {
@@ -155,6 +160,7 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
             "size_bytes": document.size_bytes,
             "summary": result.summary,
             "key_points": result.key_points,
+            "hallucinations": getattr(result, "hallucinations", []),
             "processing_time_ms": result.processing_time_ms,
         }
         console.print_json(data=output_data)
@@ -174,6 +180,11 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
             for point in result.key_points:
                 console.print(f"• {point}")
 
+        if getattr(result, "hallucinations", None):
+            console.print("\nPOTENTIAL HALLUCINATIONS:")
+            for h in result.hallucinations:
+                console.print(f"- {h}")
+
     elif output_format == "md":
         # Markdown output
         console.print(f"# Document Summary: {Path(document.path).name}")
@@ -191,6 +202,11 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
             console.print()
             for point in result.key_points:
                 console.print(f"- {point}")
+        if getattr(result, "hallucinations", None):
+            console.print("## Potential Hallucinations")
+            console.print()
+            for h in result.hallucinations:
+                console.print(f"- {h}")
 
 
 def _save_summary(

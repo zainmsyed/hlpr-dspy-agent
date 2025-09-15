@@ -58,6 +58,7 @@ class DSPyDocumentSummarizer:
         max_tokens: int = 8192,
         temperature: float = 0.3,
         timeout: int = 30,
+        fast_fail_seconds: float | None = 1.0,
     ):
         """Initialize DSPy document summarizer.
 
@@ -83,6 +84,10 @@ class DSPyDocumentSummarizer:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.timeout = timeout
+        # Number of seconds to wait for an immediate response before
+        # continuing to wait up to `timeout`. If None, don't attempt
+        # the short fast-fail wait and wait for the full timeout.
+        self.fast_fail_seconds = fast_fail_seconds
 
         # Store LM configuration for per-instance use
         self._lm_config = self._create_lm_config()
@@ -258,30 +263,75 @@ class DSPyDocumentSummarizer:
 
         try:
             with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_call_summarizer)
+                max_attempts = 2
+                result = None
 
-                # Fast-fail strategy: wait a short period for immediate failures
-                # (model-not-found, invalid-config). If we don't get a result
-                # within the short window, cancel and abort quickly instead of
-                # waiting the full timeout which is undesirable for local use.
-                fast_fail_seconds = 1.0
-                try:
-                    result = future.result(timeout=fast_fail_seconds)
-                except FutureTimeoutError:
-                    # No immediate response; attempt to get final result but
-                    # don't block the caller for the full timeout. Try to
-                    # cancel the future and raise so callers can handle
-                    # non-responsive LLMs deterministically.
-                    with contextlib.suppress(Exception):
-                        future.cancel()
+                for attempt in range(1, max_attempts + 1):
+                    future = executor.submit(_call_summarizer)
 
-                    processing_time_ms = int((time.time() - start_time) * 1000)
-                    msg = (
-                        "DSPy summarization did not respond immediately; "
-                        "aborting to avoid long waits (fast-fail)."
-                    )
-                    logger.warning(msg)
-                    raise RuntimeError(msg) from None
+                    try:
+                        # LOCAL provider: allow longer startup/warmup times.
+                        # Do a short probe if configured to catch immediate
+                        # deterministic failures (bad config). If the probe
+                        # times out, wait without timeout to allow the local
+                        # model to finish loading and respond.
+                        if self.provider == "local":
+                            if self.fast_fail_seconds is not None:
+                                try:
+                                    result = future.result(timeout=self.fast_fail_seconds)
+                                except FutureTimeoutError:
+                                    logger.info(
+                                        "DSPy local summarizer taking longer than %.2fs; waiting without timeout",
+                                        self.fast_fail_seconds,
+                                    )
+                                    result = future.result()
+                            else:
+                                result = future.result()
+
+                        # Non-local providers: enforce configured timeout
+                        elif self.fast_fail_seconds is None:
+                            result = future.result(timeout=self.timeout)
+                        else:
+                            try:
+                                result = future.result(timeout=self.fast_fail_seconds)
+                            except FutureTimeoutError:
+                                elapsed = time.time() - start_time
+                                remaining = max(self.timeout - elapsed, 0.1)
+                                logger.info(
+                                    "DSPy summarizer taking longer than %.2fs; waiting up to %.2fs more before aborting",
+                                    self.fast_fail_seconds,
+                                    remaining,
+                                )
+                                try:
+                                    result = future.result(timeout=remaining)
+                                except FutureTimeoutError:
+                                    with contextlib.suppress(Exception):
+                                        future.cancel()
+
+                                    processing_time_ms = int((time.time() - start_time) * 1000)
+                                    msg = (
+                                        "DSPy summarization did not complete within the "
+                                        "configured timeout; aborting."
+                                    )
+                                    logger.warning(msg)
+                                    raise RuntimeError(msg) from None
+
+                        # If we got a result, break out of retry loop
+                        if result is not None:
+                            break
+
+                    except Exception as exc:
+                        # On failure, retry once (useful for transient errors)
+                        logger.warning(
+                            "DSPy summarization attempt %d failed: %s",
+                            attempt,
+                            exc,
+                        )
+                        if attempt == max_attempts:
+                            # Re-raise the last exception to be handled by
+                            # the outer exception handlers below
+                            raise
+                        # Otherwise, continue to the next attempt
 
             # Ensure key_points is a list
             key_points = result.key_points
