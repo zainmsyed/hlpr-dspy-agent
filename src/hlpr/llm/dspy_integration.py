@@ -91,6 +91,17 @@ class DSPyDocumentSummarizer:
 
         # Store LM configuration for per-instance use
         self._lm_config = self._create_lm_config()
+        # Prefer fresh model runs for summarization/verification by
+        # disabling the LM-level cache for this instance when possible.
+        # This prevents reusing previous responses during iterative tests.
+        # Some dspy LM implementations expose a `cache` attribute
+        # (teleprompt utilities toggle this in tests). Prefer to disable
+        # it for fresh runs; suppress any errors if the attribute is
+        # unavailable or not writable.
+        # Attempt attribute assignment if available; suppress exceptions
+        with contextlib.suppress(Exception):
+            if hasattr(self._lm_config, "cache"):
+                self._lm_config.cache = False
         self.summarizer = None  # Will be created on-demand
 
     def _create_lm_config(self) -> dspy.LM:
@@ -245,6 +256,105 @@ class DSPyDocumentSummarizer:
         if isinstance(key_points, list):
             return [str(p).strip() for p in key_points if str(p).strip()]
         return [str(key_points)]
+
+    class VerificationSignature(dspy.Signature):
+        """DSPy signature for claim verification.
+
+        Inputs:
+            source_text: full document or excerpt
+            claim: the sentence/claim to verify
+
+        Outputs:
+            verdict: 'yes'|'no'|'uncertain'
+            evidence: supporting text excerpt (optional)
+            confidence: numeric confidence 0..1 (optional)
+        """
+
+        source_text: str = dspy.InputField(desc="Source document text")
+        claim: str = dspy.InputField(desc="Claim to verify")
+        verdict: str = dspy.OutputField(desc="yes|no|uncertain")
+        evidence: str = dspy.OutputField(desc="Supporting evidence excerpt")
+        confidence: float = dspy.OutputField(desc="Confidence 0..1")
+
+    def verify_claims(self, source_text: str, claims: list[str]) -> list[dict]:
+        """Model-backed verification for a list of claims.
+
+        For each claim, runs a DSPy Predict using `VerificationSignature` and
+        returns a dict with keys: claim, model_supported (bool|None),
+        model_confidence (float|None), model_evidence (str).
+
+        This is best-effort and will return conservative defaults on failure.
+        """
+        results: list[dict] = []
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                for claim in claims:
+                    def _call_verifier(claim=claim):
+                        with self._dspy_context():
+                            verifier = dspy.Predict(self.VerificationSignature)
+                            return verifier(source_text=source_text, claim=claim)
+
+                    future = executor.submit(_call_verifier)
+                    try:
+                        start_time = time.time()
+                        # use a short per-claim timeout
+                        raw = self._result_from_future(future, start_time)
+                    except Exception:
+                        logger.exception("Model-backed verification failed for a claim")
+                        results.append(
+                            {
+                                "claim": claim,
+                                "model_supported": None,
+                                "model_confidence": None,
+                                "model_evidence": "",
+                            },
+                        )
+                        continue
+
+                    # Parse model outputs conservatively
+                    verdict = getattr(raw, "verdict", "uncertain")
+                    evidence = getattr(raw, "evidence", "")
+                    confidence = getattr(raw, "confidence", None)
+
+                    model_supported = None
+                    if isinstance(verdict, str):
+                        v = verdict.strip().lower()
+                        if v in ("yes", "supported", "true"):
+                            model_supported = True
+                        elif v in ("no", "unsupported", "false"):
+                            model_supported = False
+
+                    # Attempt to normalize confidence
+                    try:
+                        conf_val = (
+                            float(confidence) if confidence is not None else None
+                        )
+                    except (ValueError, TypeError) as exc:
+                        # tolerant parsing: non-numeric confidence will be ignored
+                        logger.debug("Could not parse confidence: %s", exc)
+                        conf_val = None
+
+                    results.append(
+                        {
+                            "claim": claim,
+                            "model_supported": model_supported,
+                            "model_confidence": conf_val,
+                            "model_evidence": evidence or "",
+                        },
+                    )
+        except Exception:  # pragma: no cover - best-effort
+            logger.exception("verify_claims failed")
+            return [
+                {
+                    "claim": c,
+                    "model_supported": None,
+                    "model_confidence": None,
+                    "model_evidence": "",
+                }
+                for c in claims
+            ]
+        else:
+            return results
 
     @classmethod
     def get_supported_providers(cls) -> list[str]:
