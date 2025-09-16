@@ -115,20 +115,28 @@ Single project structure per plan.md:
 ## Phase 3.5: Polish (IN PROGRESS)
 - [x] **T018** [P] Unit tests for document parsing in tests/unit/test_document_parser.py
 - [x] **T019** Performance tests for document processing (<2s target)
-- [x] **T022** Hallucination mitigation (basic detector + CLI warnings)
-- [ ] **T020** [P] Document processing documentation in docs/document-processing.md
-- [ ] **T021** Update quickstart guide with document examples
-- [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
 - [x] **T020** [P] Document processing documentation in docs/document-processing.md (README updated with temperature docs)
 - [x] **T021** Update quickstart guide with document examples (examples referenced in README)
+- [x] **T022** Hallucination mitigation (basic detector + CLI warnings)
 - [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
+
+## Phase 3.6: Code Quality & Refactoring (NEW - HIGH PRIORITY)
+- [ ] **T024** Complete DSPy verify_claims refactor in src/hlpr/llm/dspy_integration.py
+- [ ] **T025** [P] Split API endpoints: create /document/upload and /document/text in src/hlpr/api/summarize.py  
+- [ ] **T026** [P] Centralized configuration management in src/hlpr/config.py
+- [ ] **T027** [P] Custom exception hierarchy in src/hlpr/exceptions.py
+- [ ] **T028** Enhanced structured logging across API and CLI modules
 
 ## Dependencies
 - Tests (T004-T006) before implementation (T007-T013)
 - T007 (Document model) blocks T008-T009 (parser/summarizer)
 - T008-T009 blocks T010-T011 (CLI/API)
 - T014 (DSPy) blocks T017 (provider integration)
-- Implementation before polish (T018-T021)
+- Implementation before polish (T018-T023)
+- **Phase 3.6 Dependencies:**
+  - T024 (DSPy refactor) should complete before other code quality tasks
+  - T025-T028 can run in parallel (different files/modules)
+  - T026 (config) blocks T027-T028 (exception/logging need config)
 
 ## Parallel Execution Examples
 ```
@@ -177,3 +185,69 @@ Task: "Document summarization service in src/hlpr/document/summarizer.py"
 - [x] **Phase 3.3 Core Implementation: COMPLETE** ✅
 - [x] **Critical Security Fixes Applied** ✅
 - [x] **All Document Summarization Tests Passing** ✅
+
+## 📋 **Detailed Task Descriptions - Phase 3.6**
+
+### **T024: Complete DSPy verify_claims refactor** (CRITICAL)
+**File**: `src/hlpr/llm/dspy_integration.py`
+**Goal**: Remove C901 complexity warning without noqa suppression
+**Actions**:
+1. Extract `_verify_single_claim(source_text, claim) -> dict` method
+2. Extract `_build_verification_result(claim, raw_result) -> dict` method  
+3. Simplify main `verify_claims` to coordinate via list comprehension
+4. Add unit tests mocking `dspy.Predict` for deterministic timeout/success scenarios
+5. Verify Ruff passes without C901 noqa
+
+### **T025: Split API endpoints** (HIGH)
+**File**: `src/hlpr/api/summarize.py`
+**Goal**: Reduce cognitive complexity by separating concerns
+**Actions**:
+1. Create `@router.post("/document/upload")` for file uploads only
+2. Create `@router.post("/document/text")` for text content only
+3. Keep existing `/document` endpoint for backward compatibility (delegate to new endpoints)
+4. Move file validation logic to upload endpoint
+5. Move text validation logic to text endpoint
+6. Update OpenAPI documentation
+
+### **T026: Centralized configuration management** (HIGH)
+**File**: `src/hlpr/config.py` (new file)
+**Goal**: Replace scattered constants with environment-driven config
+**Actions**:
+1. Create `@dataclass HlprConfig` with defaults:
+   - `max_file_size: int = 100 * 1024 * 1024`
+   - `max_text_length: int = 10 * 1024 * 1024`
+   - `default_timeout: int = 30`
+   - `allowed_origins: list[str]`
+2. Add `@classmethod from_env(cls) -> HlprConfig` method
+3. Replace constants in `summarize.py`, `main.py`
+4. Update DSPy integration to use config timeouts
+5. Add environment variable documentation
+
+### **T027: Custom exception hierarchy** (MEDIUM)
+**File**: `src/hlpr/exceptions.py` (new file)  
+**Goal**: Replace generic exceptions with domain-specific error types
+**Actions**:
+1. Define base `HlprError(Exception)` class
+2. Create `DocumentProcessingError(HlprError)` for parsing failures
+3. Create `SummarizationError(HlprError)` for LLM failures
+4. Create `ConfigurationError(HlprError)` for setup issues
+5. Update error handling in API, CLI, and DSPy integration
+6. Add structured error responses with error codes
+
+### **T028: Enhanced structured logging** (MEDIUM)
+**Files**: `src/hlpr/api/summarize.py`, `src/hlpr/cli/summarize.py`, `src/hlpr/llm/dspy_integration.py`
+**Goal**: Improve observability with correlation IDs and metadata
+**Actions**:
+1. Add correlation ID generation (`str(uuid4())`) to request handlers
+2. Replace `logger.exception()` calls with structured logging:
+   ```python
+   logger.info("Document processing started", extra={
+       "correlation_id": correlation_id,
+       "file_size": len(content), 
+       "provider": provider_id,
+       "processing_type": "file_upload"
+   })
+   ```
+3. Add processing time, success/failure metrics
+4. Include error context without sensitive data leakage
+5. Update CLI to use structured logging for debugging modes

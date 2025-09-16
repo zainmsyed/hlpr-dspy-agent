@@ -1,5 +1,6 @@
 # ruff: noqa: SLF001
 import types
+import contextlib
 
 import dspy
 
@@ -35,6 +36,10 @@ def test_verify_claims_with_mocked_predict(monkeypatch):
         return call
 
     monkeypatch.setattr(dspy, "Predict", fake_predict)
+    # Avoid mutating dspy.settings during unit tests; use a no-op context
+    monkeypatch.setattr(
+        DSPyDocumentSummarizer, "_dspy_context", lambda self: contextlib.nullcontext()
+    )
 
     summarizer = DSPyDocumentSummarizer(provider="local", model="gemma3:latest")
 

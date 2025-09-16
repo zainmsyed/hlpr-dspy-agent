@@ -302,7 +302,96 @@ class DSPyDocumentSummarizer:
         evidence: str = dspy.OutputField(desc="Supporting evidence excerpt")
         confidence: float = dspy.OutputField(desc="Confidence 0..1")
 
-    def verify_claims(self, source_text: str, claims: list[str]) -> list[dict]:  # noqa: C901 - complex but isolated
+    def _parse_raw_verdict(self, raw_obj) -> tuple[str, str, float | None]:
+        """Return (verdict_str, evidence_str, confidence_float_or_none).
+
+        This helper narrows exception handling to only the minimal cases
+        where a model output's attributes are broken or non-stringable.
+        """
+        verdict = getattr(raw_obj, "verdict", "uncertain")
+        evidence = getattr(raw_obj, "evidence", "")
+        confidence = getattr(raw_obj, "confidence", None)
+
+        # Coerce to safe primitives with narrow exception handling
+        try:
+            v_str = str(verdict) if verdict is not None else "uncertain"
+        except (TypeError, ValueError):
+            v_str = "uncertain"
+
+        try:
+            e_str = str(evidence) if evidence is not None else ""
+        except (TypeError, ValueError):
+            e_str = ""
+
+        try:
+            conf_val = float(confidence) if confidence is not None else None
+        except (ValueError, TypeError):
+            conf_val = None
+
+        return v_str, e_str, conf_val
+
+    def _build_verification_result(self, claim: str, raw_obj) -> dict:
+        """Convert a raw DSPy verdict object into the standardized result dict."""
+        v_str, e_str, conf_val = self._parse_raw_verdict(raw_obj)
+
+        model_supported = None
+        if isinstance(v_str, str):
+            v = v_str.strip().lower()
+            if v in ("yes", "supported", "true"):
+                model_supported = True
+            elif v in ("no", "unsupported", "false"):
+                model_supported = False
+
+        return {
+            "claim": claim,
+            "model_supported": model_supported,
+            "model_confidence": conf_val,
+            "model_evidence": e_str or "",
+        }
+
+    def _verify_single_claim(self, source_text: str, claim: str) -> dict:
+        """Run verifier for a single claim and return the result dict.
+
+        This method isolates the threading, DSPy call, and timeout handling so
+        that `verify_claims` can remain a simple coordinator.
+        """
+        # Create the verifier under the DSPy-configured context on the
+        # calling thread. Submitting only the call to the worker thread
+        # avoids attempting to mutate dspy.settings from worker threads
+        # which some DSPy backends forbid.
+        try:
+            with self._dspy_context():
+                verifier = dspy.Predict(self.VerificationSignature)
+        except Exception:
+            # If creating a verifier fails, log and return conservative default
+            logger.exception("Failed to create DSPy verifier in calling thread")
+            return {
+                "claim": claim,
+                "model_supported": None,
+                "model_confidence": None,
+                "model_evidence": "",
+            }
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            def _call_verifier():
+                return verifier(source_text=source_text, claim=claim)
+
+            future = executor.submit(_call_verifier)
+            try:
+                start_time = time.time()
+                raw = self._result_from_future(future, start_time)
+            except Exception:
+                logger.exception("Model-backed verification failed for a claim")
+                return {
+                    "claim": claim,
+                    "model_supported": None,
+                    "model_confidence": None,
+                    "model_evidence": "",
+                }
+
+            return self._build_verification_result(claim, raw)
+
+    def verify_claims(self, source_text: str, claims: list[str]) -> list[dict]:
         """Model-backed verification for a list of claims.
 
         For each claim, runs a DSPy Predict using `VerificationSignature` and
@@ -311,73 +400,7 @@ class DSPyDocumentSummarizer:
 
         This is best-effort and will return conservative defaults on failure.
         """
-        def _parse_raw_verdict(raw_obj) -> tuple[str, str, float | None]:
-            """Return (verdict_str, evidence_str, confidence_float_or_none).
-
-            This helper narrows exception handling to only the minimal cases
-            where a model output's attributes are broken or non-stringable.
-            """
-            verdict = getattr(raw_obj, "verdict", "uncertain")
-            evidence = getattr(raw_obj, "evidence", "")
-            confidence = getattr(raw_obj, "confidence", None)
-
-            # Coerce to safe primitives with narrow exception handling
-            try:
-                v_str = str(verdict) if verdict is not None else "uncertain"
-            except (TypeError, ValueError):
-                v_str = "uncertain"
-
-            try:
-                e_str = str(evidence) if evidence is not None else ""
-            except (TypeError, ValueError):
-                e_str = ""
-
-            try:
-                conf_val = float(confidence) if confidence is not None else None
-            except (ValueError, TypeError):
-                conf_val = None
-
-            return v_str, e_str, conf_val
-
-        def _run_verifier(claim: str) -> dict:
-            """Run verifier for a single claim and return the result dict."""
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                def _call_verifier(claim=claim):
-                    with self._dspy_context():
-                        verifier = dspy.Predict(self.VerificationSignature)
-                        return verifier(source_text=source_text, claim=claim)
-
-                future = executor.submit(_call_verifier)
-                try:
-                    start_time = time.time()
-                    raw = self._result_from_future(future, start_time)
-                except Exception:
-                    logger.exception("Model-backed verification failed for a claim")
-                    return {
-                        "claim": claim,
-                        "model_supported": None,
-                        "model_confidence": None,
-                        "model_evidence": "",
-                    }
-
-                v_str, e_str, conf_val = _parse_raw_verdict(raw)
-
-                model_supported = None
-                if isinstance(v_str, str):
-                    v = v_str.strip().lower()
-                    if v in ("yes", "supported", "true"):
-                        model_supported = True
-                    elif v in ("no", "unsupported", "false"):
-                        model_supported = False
-
-                return {
-                    "claim": claim,
-                    "model_supported": model_supported,
-                    "model_confidence": conf_val,
-                    "model_evidence": e_str or "",
-                }
-
-        return [_run_verifier(c) for c in claims]
+        return [self._verify_single_claim(source_text, c) for c in claims]
 
     @classmethod
     def get_supported_providers(cls) -> list[str]:
