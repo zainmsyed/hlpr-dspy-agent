@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
 
+from hlpr.config import CONFIG
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
 from hlpr.models.document import Document
@@ -76,10 +77,10 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         "--temperature",
         help="Sampling temperature for the model (0.0-1.0)",
     ),
-    dspy_timeout: int = typer.Option(
-        30,
+    dspy_timeout: int | None = typer.Option(
+        None,
         "--dspy-timeout",
-        help="DSPy request timeout in seconds",
+        help="DSPy request timeout in seconds (falls back to HLPR_DEFAULT_TIMEOUT)",
     ),
     no_fallback: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
         default=False,
@@ -104,14 +105,17 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
     try:
         document, extracted_text = _parse_with_progress(file_path, verbose)
 
-        # Initialize summarizer
+        # Initialize summarizer (use CONFIG.default_timeout when not provided)
+        timeout_val = (
+            dspy_timeout if dspy_timeout is not None else CONFIG.default_timeout
+        )
         summarizer = DocumentSummarizer(
             provider=provider,
             model=model,
             temperature=temperature,
             api_base=None,
             api_key=None,
-            timeout=dspy_timeout,
+            timeout=timeout_val,
             no_fallback=no_fallback,
             verify_hallucinations=verify_hallucinations,
         )

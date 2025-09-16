@@ -555,7 +555,7 @@ class DSPyDocumentSummarizer:
 def create_dspy_summarizer(
     provider: str = "local",
     model: str = "gemma3:latest",
-    timeout: int | None = None,
+    timeout: int = 30,
     **kwargs,
 ) -> DSPyDocumentSummarizer:
     """Factory function to create DSPy document summarizer.
@@ -572,6 +572,6 @@ def create_dspy_summarizer(
     return DSPyDocumentSummarizer(
         provider=provider,
         model=model,
-        timeout=timeout if timeout is not None else CONFIG.default_timeout,
+        timeout=timeout,
         **kwargs,
     )
