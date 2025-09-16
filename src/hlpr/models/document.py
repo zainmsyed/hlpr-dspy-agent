@@ -9,6 +9,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
+from hlpr.config import CONFIG
+
 
 class FileFormat(str, Enum):
     """Supported document file formats."""
@@ -109,7 +111,7 @@ class Document(BaseModel):
     @classmethod
     def validate_size(cls, v: int) -> int:
         """Validate file size is within acceptable limits."""
-        max_size = 100 * 1024 * 1024  # 100MB
+        max_size = CONFIG.max_file_size
         if v <= 0:
             msg = "File size must be greater than 0"
             raise ValueError(msg)

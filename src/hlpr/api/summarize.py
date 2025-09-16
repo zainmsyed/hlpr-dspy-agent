@@ -13,15 +13,16 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from hlpr.api.utils import safe_serialize
+from hlpr.config import CONFIG
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
 from hlpr.models.document import Document
 
 logger = logging.getLogger(__name__)
 
-# API configuration constants
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB max file size
-MAX_TEXT_LENGTH = 10 * 1024 * 1024  # 10MB max text length
+# Use centralized configuration
+MAX_FILE_SIZE = CONFIG.max_file_size
+MAX_TEXT_LENGTH = CONFIG.max_text_length
 
 router = APIRouter()
 

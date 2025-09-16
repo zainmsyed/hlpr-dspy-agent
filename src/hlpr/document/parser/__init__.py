@@ -17,12 +17,13 @@ except ModuleNotFoundError:
 
 from docx import Document as DocxDocument
 
+from hlpr.config import CONFIG
 from hlpr.models.document import Document, FileFormat
 
 logger = logging.getLogger(__name__)
 
-# Memory management constants
-MAX_MEMORY_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+# Memory management constants (centralized)
+MAX_MEMORY_FILE_SIZE = CONFIG.max_memory_file_size
 STREAMING_CHUNK_SIZE = 1024 * 1024  # 1MB chunks for streaming
 
 

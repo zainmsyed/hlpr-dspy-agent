@@ -15,6 +15,8 @@ from contextlib import contextmanager
 import dspy
 from pydantic import BaseModel
 
+from hlpr.config import CONFIG
+
 logger = logging.getLogger(__name__)
 
 # Thread-safe DSPy configuration lock. Serializes calls to dspy.configure()
@@ -54,13 +56,13 @@ class DSPyDocumentSummarizer:
     def __init__(  # noqa: PLR0913 - public initializer keeps backward-compatible args
         self,
         provider: str = "local",
-    model: str = "gemma3:latest",
+        model: str = "gemma3:latest",
         api_base: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 8192,
         temperature: float = 0.3,
-        timeout: int = 30,
-        fast_fail_seconds: float | None = 1.0,
+        timeout: int | None = None,
+        fast_fail_seconds: float | None = None,
     ):
         """Initialize DSPy document summarizer.
 
@@ -71,7 +73,7 @@ class DSPyDocumentSummarizer:
             api_key: API key for cloud providers
             max_tokens: Maximum tokens per request
             temperature: Sampling temperature
-            timeout: Request timeout in seconds
+            timeout: Request timeout in seconds (default from CONFIG if None)
 
         Raises:
             ValueError: If provider configuration is invalid
@@ -85,11 +87,16 @@ class DSPyDocumentSummarizer:
         self.api_key = api_key
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self.timeout = timeout
+        # Use centralized defaults when None provided
+        self.timeout = timeout if timeout is not None else CONFIG.default_timeout
         # Number of seconds to wait for an immediate response before
         # continuing to wait up to `timeout`. If None, don't attempt
         # the short fast-fail wait and wait for the full timeout.
-        self.fast_fail_seconds = fast_fail_seconds
+        self.fast_fail_seconds = (
+            fast_fail_seconds
+            if fast_fail_seconds is not None
+            else CONFIG.default_fast_fail_seconds
+        )
 
         # Store LM configuration for per-instance use
         self._lm_config = self._create_lm_config()
@@ -548,7 +555,7 @@ class DSPyDocumentSummarizer:
 def create_dspy_summarizer(
     provider: str = "local",
     model: str = "gemma3:latest",
-    timeout: int = 30,
+    timeout: int | None = None,
     **kwargs,
 ) -> DSPyDocumentSummarizer:
     """Factory function to create DSPy document summarizer.
@@ -565,6 +572,6 @@ def create_dspy_summarizer(
     return DSPyDocumentSummarizer(
         provider=provider,
         model=model,
-        timeout=timeout,
+        timeout=timeout if timeout is not None else CONFIG.default_timeout,
         **kwargs,
     )

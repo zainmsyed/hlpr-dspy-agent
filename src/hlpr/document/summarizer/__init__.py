@@ -6,6 +6,7 @@ import time
 
 from pydantic import BaseModel
 
+from hlpr.config import CONFIG
 from hlpr.document.chunker import DocumentChunker
 from hlpr.document.progress import (
     ProcessingPhase,
@@ -44,7 +45,7 @@ class DocumentSummarizer:
         api_key: str | None = None,
         max_tokens: int = 8192,
         temperature: float = 0.3,
-        timeout: int = 30,
+        timeout: int | None = None,
         progress_tracker: ProgressTracker | None = None,
         *,
         no_fallback: bool = False,
@@ -68,7 +69,8 @@ class DocumentSummarizer:
         self.api_key = api_key
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self.timeout = timeout
+        # Use centralized default when None provided
+        self.timeout = timeout if timeout is not None else CONFIG.default_timeout
         self.progress_tracker = progress_tracker or create_progress_tracker()
         self.no_fallback = no_fallback
         self.verify_hallucinations_flag = verify_hallucinations
@@ -83,7 +85,7 @@ class DocumentSummarizer:
                 api_key=api_key,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                timeout=timeout,
+                timeout=self.timeout,
             )
         except Exception:  # pragma: no cover - best-effort fallback
             # Log full exception information to aid debugging, then fall back.
