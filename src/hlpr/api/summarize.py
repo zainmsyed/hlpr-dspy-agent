@@ -416,6 +416,70 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=detail,
         ) from e
+
+
+@router.post(
+    "/document/upload",
+    response_model=DocumentSummaryResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        422: {"model": ErrorResponse, "description": "Processing error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def summarize_document_upload(
+    file: UploadFile,
+    provider_id: str | None = None,
+    format_param: str | None = "json",
+    temperature: float | None = None,
+) -> DocumentSummaryResponse:
+    """Summarize an uploaded document file only."""
+    start_time = time.time()
+
+    if not file or not file.filename:
+        _raise_http(
+            status.HTTP_400_BAD_REQUEST,
+            ErrorResponse(error="No file uploaded", error_code="NO_FILE"),
+        )
+
+    file_content = await file.read()
+    resp = _process_file_upload(
+        filename=file.filename,
+        file_content=file_content,
+        provider_id=provider_id,
+        temperature=temperature,
+        start_time=start_time,
+    )
+    resp.format = format_param or resp.format
+    content = safe_serialize(resp.model_dump())
+    return JSONResponse(status_code=status.HTTP_200_OK, content=content)
+
+
+@router.post(
+    "/document/text",
+    response_model=DocumentSummaryResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        422: {"model": ErrorResponse, "description": "Processing error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def summarize_document_text(
+    request: SummarizeTextRequest,
+) -> DocumentSummaryResponse:
+    """Summarize raw text content only (JSON request)."""
+    # Delegate to helper used by CLI and existing text endpoint
+    start_time = time.time()
+    response_obj = _process_text_request(
+        text_content=request.text_content,
+        title=request.title,
+        provider=request.provider_id or "local",
+        temperature=request.temperature,
+        start_time=start_time,
+    )
+    response_obj.format = request.format or response_obj.format
+    content = safe_serialize(response_obj.model_dump())
+    return JSONResponse(status_code=status.HTTP_200_OK, content=content)
 async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryResponse:
     """Summarize raw text content."""
     start_time = time.time()

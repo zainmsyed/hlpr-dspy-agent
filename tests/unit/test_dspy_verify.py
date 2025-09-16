@@ -1,5 +1,6 @@
-import pytest
 import contextlib
+
+import pytest
 
 from hlpr.llm.dspy_integration import DSPyDocumentSummarizer
 
@@ -24,7 +25,7 @@ def test_verify_claims_success(monkeypatch):
 
     # Avoid mutating dspy.settings during unit tests; use a no-op context
     monkeypatch.setattr(
-        DSPyDocumentSummarizer, "_dspy_context", lambda self: contextlib.nullcontext()
+        DSPyDocumentSummarizer, "_dspy_context", lambda _: contextlib.nullcontext(),
     )
     monkeypatch.setattr(summ, "_result_from_future", fake_result_from_future)
 

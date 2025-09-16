@@ -121,7 +121,7 @@ Single project structure per plan.md:
 - [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
 
 ## Phase 3.6: Code Quality & Refactoring (NEW - HIGH PRIORITY)
-- [ ] **T024** Complete DSPy verify_claims refactor in src/hlpr/llm/dspy_integration.py
+- [x] **T024** Complete DSPy verify_claims refactor in src/hlpr/llm/dspy_integration.py
 - [ ] **T025** [P] Split API endpoints: create /document/upload and /document/text in src/hlpr/api/summarize.py  
 - [ ] **T026** [P] Centralized configuration management in src/hlpr/config.py
 - [ ] **T027** [P] Custom exception hierarchy in src/hlpr/exceptions.py
