@@ -1,5 +1,6 @@
 """Main FastAPI application for hlpr."""
 
+import os
 import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -9,6 +10,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
+
+# Local routers (keep top-level imports together)
+from hlpr.api import email as email_router
+from hlpr.api import jobs as jobs_router
+from hlpr.api import providers as providers_router
+from hlpr.api.summarize import ErrorResponse
+from hlpr.api.summarize import router as summarize_router
+from hlpr.api.utils import safe_serialize
 
 # Suppress known noisy warnings from dependencies that are not actionable
 # in our code path during tests (these originate from third-party adapters
@@ -48,13 +57,6 @@ warnings.filterwarnings(
     message=r".*Use 'content=.*' to upload raw bytes/text content.*",
 )
 
-from hlpr.api import email as email_router
-from hlpr.api import jobs as jobs_router
-from hlpr.api import providers as providers_router
-from hlpr.api.summarize import ErrorResponse
-from hlpr.api.summarize import router as summarize_router
-from hlpr.api.utils import safe_serialize
-
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
@@ -73,9 +75,30 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+def _get_allowed_origins() -> list[str]:
+    """Return allowed CORS origins from environment or sane defaults.
+
+    - HLPR_ALLOWED_ORIGINS can be set to a comma-separated list of origins.
+    - If set to '*' (single character), all origins are allowed (useful
+      for development only).
+    - Default is limited to localhost addresses to avoid accidental
+      wide-open CORS in production.
+    """
+    env = os.getenv("HLPR_ALLOWED_ORIGINS")
+    if env is None:
+        return ["http://localhost", "http://127.0.0.1"]
+    env = env.strip()
+    if env == "*":
+        return ["*"]
+    # Split comma-separated list and strip whitespace
+    origins = [o.strip() for o in env.split(",") if o.strip()]
+    return origins or ["http://localhost", "http://127.0.0.1"]
+
+
+allowed_origins = _get_allowed_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

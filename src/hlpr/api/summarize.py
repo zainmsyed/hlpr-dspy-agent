@@ -70,16 +70,25 @@ class MeetingSummaryResponse(BaseModel):
     """Response model for meeting summarization."""
 
     id: str = Field(..., description="Unique identifier for the meeting summary")
-    overview: str = Field(..., description="Short overview / summary of the meeting")
-    key_points: list[str] = Field(default_factory=list, description="Key points from the meeting")
-    action_items: list[str] = Field(default_factory=list, description="Extracted action items")
-    participants: list[str] = Field(default_factory=list, description="Detected participants")
+    overview: str = Field(
+        ..., description="Short overview / summary of the meeting",
+    )
+    key_points: list[str] = Field(
+        default_factory=list, description="Key points from the meeting",
+    )
+    action_items: list[str] = Field(
+        default_factory=list, description="Extracted action items",
+    )
+    participants: list[str] = Field(
+        default_factory=list, description="Detected participants",
+    )
     processing_time_ms: int = Field(..., description="Time taken to process")
 
 
 def _raise_http(status_code: int, error: ErrorResponse) -> None:
     """Helper to raise HTTPException with a standardized body."""
-    raise HTTPException(status_code=status_code, detail=safe_serialize(error.model_dump()))
+    detail = safe_serialize(error.model_dump())
+    raise HTTPException(status_code=status_code, detail=detail)
 
 
 def _process_file_upload(
@@ -94,12 +103,13 @@ def _process_file_upload(
     file_path = Path(filename)
     extension = file_path.suffix.lower().lstrip(".")
     if extension not in ["pdf", "docx", "txt", "md"]:
+        supported = {"supported_formats": ["pdf", "docx", "txt", "md"]}
         _raise_http(
             status.HTTP_400_BAD_REQUEST,
             ErrorResponse(
                 error=f"Unsupported file format: {extension}",
                 error_code="UNSUPPORTED_FORMAT",
-                details=safe_serialize({"supported_formats": ["pdf", "docx", "txt", "md"]}),
+                details=safe_serialize(supported),
             ),
         )
 
@@ -238,6 +248,44 @@ def _process_text_request(
         format="json",
     )
 
+
+def _extract_meeting_items(text: str) -> tuple[list[str], list[str]]:
+    """Extract action items and participants from meeting text.
+
+    This is a simple, best-effort heuristic and is intentionally lightweight.
+    """
+    action_items: list[str] = []
+    participants: list[str] = []
+
+    for line in text.splitlines():
+        low = line.lower()
+        if any(k in low for k in ["action:", "todo:", "- [ ]", "* [ ]"]):
+            action_items.append(line.strip())
+            continue
+
+        # crude heuristic: lines with 'will', 'needs to', 'should', 'to'
+        if any(k in low for k in [" will ", " needs to ", " should ", " to "]) and len(
+            line.strip(),
+        ) > 5:
+            action_items.append(line.strip())
+
+        if low.startswith(("attendees:", "present:")):
+            parts = line.split(":", 1)[1]
+            participants = [
+                p.strip()
+                for p in parts.replace("(", "").replace(")", "").split(",")
+                if p.strip()
+            ]
+            # One line is enough to determine participants
+            break
+
+    return action_items, participants
+
+
+
+    # duplicate helper removed
+
+
 @router.post(
     "/document",
     response_model=DocumentSummaryResponse,
@@ -260,39 +308,31 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
     """
     start_time = time.time()
 
+    # Read the raw body once to detect whether JSON was sent alongside a file
     try:
-        # Disallow both file upload and JSON text_content together
-        # We will inspect the request body to check for presence of JSON
-        body_bytes = None
+        body_bytes = await request.body()
+    except (RuntimeError, ValueError, OSError):
+        body_bytes = b""
+
+    has_json = False
+    if body_bytes:
         try:
-            body_bytes = await request.body()
-        except Exception:  # noqa: BLE001
-            body_bytes = None
+            _ = _json.loads(body_bytes)
+            has_json = True
+        except _json.JSONDecodeError:
+            has_json = False
 
-        has_json = False
-        if body_bytes:
-            try:
-                _ = _json.loads(body_bytes)
-                has_json = True
-            except Exception:  # noqa: BLE001
-                has_json = False
-
-        # If both file and JSON are provided, return error
+    try:
         if file is not None and file.filename and has_json:
+            err = ErrorResponse(
+                error="Provide either file upload or JSON body, not both",
+                error_code="MULTIPLE_INPUTS",
+            )
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content=safe_serialize(
-                    ErrorResponse(
-                        error=(
-                            "Provide either a file upload or JSON body with text_content,"
-                            " not both"
-                        ),
-                        error_code="MULTIPLE_INPUTS",
-                    ).model_dump(),
-                ),
+                content=safe_serialize(err.model_dump()),
             )
 
-        # If a file was uploaded, process it
         if file is not None and file.filename:
             file_content = await file.read()
             resp = _process_file_upload(
@@ -302,24 +342,27 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
                 temperature=temperature,
                 start_time=start_time,
             )
-            # Respect requested format param
             resp.format = format_param or resp.format
-            return JSONResponse(status_code=status.HTTP_200_OK, content=safe_serialize(resp.model_dump()))
+            content = safe_serialize(resp.model_dump())
+            return JSONResponse(status_code=status.HTTP_200_OK, content=content)
 
-        # Otherwise, expect JSON with text_content
-        body = await request.json()
+        # Expect JSON with text_content
+        try:
+            body = await request.json()
+        except (ValueError, TypeError, _json.JSONDecodeError):
+            body = {}
+
         text_content = body.get("text_content")
         if not text_content:
-            # Return standardized ErrorResponse at top-level for missing content
             error = ErrorResponse(
                 error="Missing text_content in request",
                 error_code="MISSING_TEXT_CONTENT",
             )
             return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST, content=safe_serialize(error.model_dump()),
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=safe_serialize(error.model_dump()),
             )
 
-        # Validate text length
         text_length = len(text_content)
         if text_length > MAX_TEXT_LENGTH:
             max_mb = MAX_TEXT_LENGTH // (1024 * 1024)
@@ -327,12 +370,12 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
             error = ErrorResponse(
                 error=f"Text content exceeds maximum length of {max_mb}MB",
                 error_code="TEXT_TOO_LONG",
-                details={
+                details=safe_serialize({
                     "max_length_bytes": MAX_TEXT_LENGTH,
                     "actual_length_bytes": text_length,
                     "max_length_mb": max_mb,
                     "actual_length_mb": actual_mb,
-                },
+                }),
             )
             return JSONResponse(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -342,7 +385,6 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
         title = body.get("title")
         provider = body.get("provider_id") or provider_id or "local"
         resp_format = body.get("format") or format_param or "json"
-        # Allow request body to include temperature as an override
         body_temp = body.get("temperature")
 
         resp = _process_text_request(
@@ -353,41 +395,27 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
             start_time=start_time,
         )
         resp.format = resp_format
-        # Return sanitized JSONResponse to avoid Pydantic serializing any
-        # third-party objects that may have leaked from the LLM internals.
-        return JSONResponse(status_code=status.HTTP_200_OK, content=safe_serialize(resp.model_dump()))
+        content = safe_serialize(resp.model_dump())
+        return JSONResponse(status_code=status.HTTP_200_OK, content=content)
 
     except HTTPException:
         raise
     except Exception as e:
         processing_time_ms = int((time.time() - start_time) * 1000)
         logger.exception("Failed to process document upload/text")
+        err = ErrorResponse(
+            error="Failed to process document",
+            error_code="PROCESSING_ERROR",
+            details={
+                "processing_time_ms": processing_time_ms,
+                "error": str(e),
+            },
+        )
+        detail = safe_serialize(err.model_dump())
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=safe_serialize(
-                ErrorResponse(
-                    error="Failed to process document",
-                    error_code="PROCESSING_ERROR",
-                    details={
-                        "processing_time_ms": processing_time_ms,
-                        "error": str(e),
-                    },
-                ).model_dump(),
-            ),
+            detail=detail,
         ) from e
-    else:
-        return resp
-
-
-@router.post(
-    "/document/text",
-    response_model=DocumentSummaryResponse,
-    responses={
-        400: {"model": ErrorResponse, "description": "Invalid request"},
-        422: {"model": ErrorResponse, "description": "Processing error"},
-        500: {"model": ErrorResponse, "description": "Internal server error"},
-    },
-)
 async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryResponse:
     """Summarize raw text content."""
     start_time = time.time()
@@ -405,22 +433,23 @@ async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryRespon
         response_obj.format = request.format or response_obj.format
 
         # Return sanitized JSONResponse to guarantee only primitives are serialized
-        return JSONResponse(status_code=status.HTTP_200_OK, content=safe_serialize(response_obj.model_dump()))
+        content = safe_serialize(response_obj.model_dump())
+        return JSONResponse(status_code=status.HTTP_200_OK, content=content)
 
     except HTTPException:
         raise
     except Exception as e:
         processing_time_ms = int((time.time() - start_time) * 1000)
         logger.exception("Failed to process text summarization")
+        err = ErrorResponse(
+            error="Failed to process text",
+            error_code="PROCESSING_ERROR",
+            details={"processing_time_ms": processing_time_ms},
+        )
+        detail = safe_serialize(err.model_dump())
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=safe_serialize(
-                ErrorResponse(
-                    error="Failed to process text",
-                    error_code="PROCESSING_ERROR",
-                    details={"processing_time_ms": processing_time_ms},
-                ).model_dump(),
-            ),
+            detail=detail,
         ) from e
 
 
@@ -437,13 +466,20 @@ async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryRespon
 async def summarize_meeting_endpoint(request: Request) -> MeetingSummaryResponse:
     """Summarize meeting notes provided as JSON.
 
-    Expected JSON body: {"content": "...", "title": "...", "date": "...", "provider_id": "local", "temperature": 0.3}
+    Expected JSON body example:
+    {
+        "content": "...",
+        "title": "...",
+        "date": "...",
+        "provider_id": "local",
+        "temperature": 0.3,
+    }
     """
     start_time = time.time()
 
     try:
         body = await request.json()
-    except Exception:
+    except (ValueError, TypeError, _json.JSONDecodeError):
         body = {}
 
     content = body.get("content")
@@ -453,47 +489,44 @@ async def summarize_meeting_endpoint(request: Request) -> MeetingSummaryResponse
 
     # Missing content -> invalid request
     if content is None:
-        err = ErrorResponse(error="Missing content in request", error_code="MISSING_CONTENT")
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=safe_serialize(err.model_dump()))
+        err = ErrorResponse(
+            error="Missing content in request",
+            error_code="MISSING_CONTENT",
+        )
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=safe_serialize(err.model_dump()),
+        )
 
     # Build overview (first non-empty line or minimal placeholder)
-    overview = (content.split("\n", 1)[0].strip() or "Meeting overview") if isinstance(content, str) else "Meeting overview"
+    if isinstance(content, str):
+        overview = content.split("\n", 1)[0].strip() or "Meeting overview"
+    else:
+        overview = "Meeting overview"
 
     # Use DocumentSummarizer to extract summary + key points when possible
+    key_points: list[str] = []
     try:
         summarizer = DocumentSummarizer(
             provider=provider,
             temperature=temperature if temperature is not None else 0.3,
         )
 
-        # If content is empty string, still return minimal results
-        if not isinstance(content, str) or not content.strip():
-            summary_result = summarizer._fallback_summarize(overview)
-        else:
+        if isinstance(content, str) and content.strip():
             summary_result = summarizer.summarize_text(content, title)
+        else:
+            summary_result = summarizer.summarize_text(overview)
 
-        key_points = summary_result.key_points or []
-
+        key_points = getattr(summary_result, "key_points", []) or []
     except Exception:
         # In case summarizer fails, fall back to simple heuristics
         logger.exception("Meeting summarization failed, using fallback heuristics")
         key_points = []
 
     # Simple heuristic extraction for action items and participants
-    action_items: list[str] = []
-    participants: list[str] = []
+    action_items, participants = ([], [])
     if isinstance(content, str):
-        for line in content.splitlines():
-            low = line.lower()
-            if any(k in low for k in ["action:", "todo:", "- [ ]", "* [ ]"]):
-                action_items.append(line.strip())
-            elif any(k in low for k in [" will ", " needs to ", " should ", " to "]):
-                if len(line.strip()) > 5:
-                    action_items.append(line.strip())
-
-            if low.startswith("attendees:") or low.startswith("present:"):
-                parts = line.split(":", 1)[1]
-                participants = [p.strip() for p in parts.replace("(", "").replace(")", "").split(",") if p.strip()]
+        action_items, participants = _extract_meeting_items(content)
 
     processing_time_ms = int((time.time() - start_time) * 1000)
 
@@ -506,4 +539,7 @@ async def summarize_meeting_endpoint(request: Request) -> MeetingSummaryResponse
         processing_time_ms=processing_time_ms,
     )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content=safe_serialize(resp.model_dump()))
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=safe_serialize(resp.model_dump()),
+    )

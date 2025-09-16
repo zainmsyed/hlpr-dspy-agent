@@ -22,5 +22,5 @@ def safe_serialize(obj: Any):
     # Fallback: return string representation
     try:
         return str(obj)
-    except Exception:
+    except Exception:  # noqa: BLE001 - defensive fallback for objects with broken __str__
         return "<unserializable>"

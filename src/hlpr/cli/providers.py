@@ -25,7 +25,7 @@ def list_providers() -> None:
 
 
 @app.command("add")
-def add_provider(
+def add_provider(  # noqa: PLR0913
     provider_id: str,
     provider_type: str = typer.Option(..., "--type"),
     model: str | None = typer.Option(None, "--model"),
@@ -73,13 +73,16 @@ def add_provider(
 @app.command("set-default")
 def set_default_provider(provider_id: str) -> None:
     """Set the default provider for tests (store first provider key)."""
-    global _providers
     if provider_id not in _providers:
         console.print("Provider not found")
         raise typer.Exit(1)
-    # For simplicity, rotate provider to front by recreating dict
+
+    # Rotate provider to front by reinserting entries in ordered fashion
     data = _providers.pop(provider_id)
-    _providers = {provider_id: data, **_providers}  # type: ignore
+    new_providers = {provider_id: data}
+    new_providers.update(_providers)
+    _providers.clear()
+    _providers.update(new_providers)
     console.print("Default provider set")
 
 

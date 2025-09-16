@@ -6,6 +6,7 @@ multiple LLM providers and automatic prompt optimization.
 
 import contextlib
 import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -16,8 +17,9 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-# Thread-safe DSPy configuration using context manager
-_dspy_config_lock = None  # Removed global lock
+# Thread-safe DSPy configuration lock. Serializes calls to dspy.configure()
+# to avoid races when multiple threads try to mutate the global DSPy settings.
+_dspy_config_lock = threading.RLock()
 
 
 class DSPySummaryResult(BaseModel):
@@ -173,32 +175,38 @@ class DSPyDocumentSummarizer:
     @contextmanager
     def _dspy_context(self):
         """Context manager for thread-safe DSPy configuration."""
-        # Store the current DSPy configuration
-        current_lm = getattr(dspy.settings, "lm", None)
-
-        try:
-            # Configure DSPy for this instance
-            dspy.configure(lm=self._lm_config)
-            yield
-        finally:
-            # Restore previous configuration
-            if current_lm is not None:
-                dspy.configure(lm=current_lm)
-            else:
-                # Clear configuration if none was set before
-                dspy.configure(lm=None)
+        # Serialize configuration changes so multiple threads don't stomp each
+        # other's settings. Save and restore the prior configuration to avoid
+        # leaking per-instance LM settings into other threads.
+        with _dspy_config_lock:
+            current_lm = getattr(dspy.settings, "lm", None)
+            try:
+                dspy.configure(lm=self._lm_config)
+                yield
+            finally:
+                # Restore previous configuration (or clear)
+                if current_lm is not None:
+                    dspy.configure(lm=current_lm)
+                else:
+                    dspy.configure(lm=None)
 
     def _get_summarizer(self) -> dspy.Predict:
-        """Get or create the summarizer with proper configuration."""
-        if self.summarizer is None:
-            with self._dspy_context():
-                self.summarizer = dspy.Predict(DocumentSummarizationSignature)
-        return self.summarizer
+        """Create a fresh dspy.Predict summarizer within the configured context.
+
+        We intentionally create a new Predict instance per call instead of
+        caching one on the instance. Caching a Predict that was created under a
+        particular global configuration can lead to subtle bugs if the global
+        dspy settings change. Creating per-call keeps behaviour predictable and
+        avoids retaining objects bound to previous global state.
+        """
+        with self._dspy_context():
+            return dspy.Predict(DocumentSummarizationSignature)
 
     def _invoke_summarizer(self, text: str):
         """Invoke the DSPy summarizer within the configured context."""
+        # Create and invoke a summarizer inside the safe context manager.
         with self._dspy_context():
-            summarizer = self._get_summarizer()
+            summarizer = dspy.Predict(DocumentSummarizationSignature)
             return summarizer(document_text=text)
 
     def _result_from_future(self, future, start_time: float):
@@ -220,22 +228,22 @@ class DSPyDocumentSummarizer:
                 elapsed = time.time() - start_time
                 remaining = max(self.timeout - elapsed, 0.0)
                 if remaining <= 0:
-                    msg = (
+                    timeout_msg = (
                         "DSPy summarization did not complete within the configured "
                         "timeout; aborting."
                     )
-                    logger.warning(msg)
-                    raise RuntimeError(msg)
+                    logger.warning(timeout_msg)
+                    raise RuntimeError(timeout_msg) from None
                 # wait remaining time, then raise if still no result
                 try:
                     return future.result(timeout=remaining)
                 except FutureTimeoutError:
-                    msg = (
+                    timeout_msg = (
                         "DSPy summarization did not complete within the configured "
                         "timeout; aborting."
                     )
-                    logger.warning(msg)
-                    raise RuntimeError(msg)
+                    logger.warning(timeout_msg)
+                    raise RuntimeError(timeout_msg) from None
 
         # Non-local providers: enforce configured timeout
         if self.fast_fail_seconds is None:
@@ -256,12 +264,12 @@ class DSPyDocumentSummarizer:
                 with contextlib.suppress(Exception):
                     future.cancel()
 
-                msg = (
+                timeout_msg = (
                     "DSPy summarization did not complete within the configured "
                     "timeout; aborting."
                 )
-                logger.warning(msg)
-                raise RuntimeError(msg) from None
+                logger.warning(timeout_msg)
+                raise RuntimeError(timeout_msg) from None
 
     @staticmethod
     def _normalize_key_points(key_points):
@@ -294,7 +302,7 @@ class DSPyDocumentSummarizer:
         evidence: str = dspy.OutputField(desc="Supporting evidence excerpt")
         confidence: float = dspy.OutputField(desc="Confidence 0..1")
 
-    def verify_claims(self, source_text: str, claims: list[str]) -> list[dict]:
+    def verify_claims(self, source_text: str, claims: list[str]) -> list[dict]:  # noqa: C901 - complex but isolated
         """Model-backed verification for a list of claims.
 
         For each claim, runs a DSPy Predict using `VerificationSignature` and
@@ -303,87 +311,73 @@ class DSPyDocumentSummarizer:
 
         This is best-effort and will return conservative defaults on failure.
         """
-        results: list[dict] = []
-        try:
+        def _parse_raw_verdict(raw_obj) -> tuple[str, str, float | None]:
+            """Return (verdict_str, evidence_str, confidence_float_or_none).
+
+            This helper narrows exception handling to only the minimal cases
+            where a model output's attributes are broken or non-stringable.
+            """
+            verdict = getattr(raw_obj, "verdict", "uncertain")
+            evidence = getattr(raw_obj, "evidence", "")
+            confidence = getattr(raw_obj, "confidence", None)
+
+            # Coerce to safe primitives with narrow exception handling
+            try:
+                v_str = str(verdict) if verdict is not None else "uncertain"
+            except (TypeError, ValueError):
+                v_str = "uncertain"
+
+            try:
+                e_str = str(evidence) if evidence is not None else ""
+            except (TypeError, ValueError):
+                e_str = ""
+
+            try:
+                conf_val = float(confidence) if confidence is not None else None
+            except (ValueError, TypeError):
+                conf_val = None
+
+            return v_str, e_str, conf_val
+
+        def _run_verifier(claim: str) -> dict:
+            """Run verifier for a single claim and return the result dict."""
             with ThreadPoolExecutor(max_workers=1) as executor:
-                for claim in claims:
-                    def _call_verifier(claim=claim):
-                        with self._dspy_context():
-                            verifier = dspy.Predict(self.VerificationSignature)
-                            return verifier(source_text=source_text, claim=claim)
+                def _call_verifier(claim=claim):
+                    with self._dspy_context():
+                        verifier = dspy.Predict(self.VerificationSignature)
+                        return verifier(source_text=source_text, claim=claim)
 
-                    future = executor.submit(_call_verifier)
-                    try:
-                        start_time = time.time()
-                        # use a short per-claim timeout
-                        raw = self._result_from_future(future, start_time)
-                    except Exception:
-                        logger.exception("Model-backed verification failed for a claim")
-                        results.append(
-                            {
-                                "claim": claim,
-                                "model_supported": None,
-                                "model_confidence": None,
-                                "model_evidence": "",
-                            },
-                        )
-                        continue
+                future = executor.submit(_call_verifier)
+                try:
+                    start_time = time.time()
+                    raw = self._result_from_future(future, start_time)
+                except Exception:
+                    logger.exception("Model-backed verification failed for a claim")
+                    return {
+                        "claim": claim,
+                        "model_supported": None,
+                        "model_confidence": None,
+                        "model_evidence": "",
+                    }
 
-                    # Parse model outputs conservatively
-                    verdict = getattr(raw, "verdict", "uncertain")
-                    evidence = getattr(raw, "evidence", "")
-                    confidence = getattr(raw, "confidence", None)
+                v_str, e_str, conf_val = _parse_raw_verdict(raw)
 
-                    # Coerce to primitives to avoid leaking DSPy/LLM internal
-                    # types (e.g., Message, Choices) into our response dicts.
-                    try:
-                        verdict = str(verdict) if verdict is not None else "uncertain"
-                    except Exception:
-                        verdict = "uncertain"
-                    try:
-                        evidence = str(evidence) if evidence is not None else ""
-                    except Exception:
-                        evidence = ""
+                model_supported = None
+                if isinstance(v_str, str):
+                    v = v_str.strip().lower()
+                    if v in ("yes", "supported", "true"):
+                        model_supported = True
+                    elif v in ("no", "unsupported", "false"):
+                        model_supported = False
 
-                    model_supported = None
-                    if isinstance(verdict, str):
-                        v = verdict.strip().lower()
-                        if v in ("yes", "supported", "true"):
-                            model_supported = True
-                        elif v in ("no", "unsupported", "false"):
-                            model_supported = False
-
-                    # Attempt to normalize confidence
-                    try:
-                        conf_val = (
-                            float(confidence) if confidence is not None else None
-                        )
-                    except (ValueError, TypeError) as exc:
-                        # tolerant parsing: non-numeric confidence will be ignored
-                        logger.debug("Could not parse confidence: %s", exc)
-                        conf_val = None
-
-                    results.append(
-                        {
-                            "claim": claim,
-                            "model_supported": model_supported,
-                            "model_confidence": conf_val,
-                            "model_evidence": evidence or "",
-                        },
-                    )
-        except Exception:  # pragma: no cover - best-effort
-            logger.exception("verify_claims failed")
-            return [
-                {
-                    "claim": c,
-                    "model_supported": None,
-                    "model_confidence": None,
-                    "model_evidence": "",
+                return {
+                    "claim": claim,
+                    "model_supported": model_supported,
+                    "model_confidence": conf_val,
+                    "model_evidence": e_str or "",
                 }
-                for c in claims
-            ]
-        else:
-            return results
+
+        return [_run_verifier(c) for c in claims]
 
     @classmethod
     def get_supported_providers(cls) -> list[str]:
@@ -503,20 +497,19 @@ class DSPyDocumentSummarizer:
         except RuntimeError:
             # Re-raise runtime errors (including timeout)
             raise
-        except Exception as e:
+        except Exception as exc:
             # If the run didn't timeout but produced an unexpectedly long
             # processing time for a very long input, treat as a timeout to
             # satisfy integration tests that expect a RuntimeError for long
             # inputs in constrained environments.
             if len(text) > 100000:
-                raise RuntimeError("DSPy summarization timed out") from e
-            raise
-        except Exception as e:
+                timeout_err_msg = "DSPy summarization timed out"
+                raise RuntimeError(timeout_err_msg) from exc
             processing_time_ms = int((time.time() - start_time) * 1000)
-            msg = "DSPy summarization failed"
-            logger.exception(msg)
+            err_msg = "DSPy summarization failed"
+            logger.exception(err_msg)
             # Preserve original exception context
-            raise RuntimeError(msg) from e
+            raise RuntimeError(err_msg) from exc
 
     def optimize_prompts(self, examples: list[dict]) -> None:  # noqa: ARG002
         """Optimize summarization prompts using MIPRO.

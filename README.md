@@ -25,3 +25,20 @@ API: POST /summarize/document
 
 You can supply an optional `temperature` field in the JSON body or as a query parameter. When omitted, the server defaults to 0.3.
 
+
+CORS configuration
+------------------
+
+By default hlpr restricts CORS to local origins to avoid accidentally
+enabling wide-open CORS in production. You can override allowed origins
+using the `HLPR_ALLOWED_ORIGINS` environment variable. Examples:
+
+- Allow localhost (default): leave `HLPR_ALLOWED_ORIGINS` unset
+- Allow a specific origin: `HLPR_ALLOWED_ORIGINS=https://example.com`
+- Allow multiple origins: `HLPR_ALLOWED_ORIGINS=https://a.com,https://b.com`
+- Allow all origins (development only): `HLPR_ALLOWED_ORIGINS=*`
+
+Set the environment variable before starting the server. For example:
+
+	export HLPR_ALLOWED_ORIGINS="https://example.com"
+
