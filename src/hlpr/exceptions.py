@@ -12,25 +12,22 @@ from typing import Any
 from starlette import status
 
 
+@dataclass
 class HlprError(Exception):
-    """Base class for hlpr domain errors.
+    """Base domain error for hlpr.
 
-    Subclasses may be dataclasses that define `message`, `code`, and
-    `details`. This base class provides helpers for consistent serialization
-    and an HTTP status mapping.
+    Use as a dataclass so subclasses can declare message/code/details
+    without repeating serialization logic.
     """
+    message: str | None = None
+    code: str = "HLPR_ERROR"
+    details: dict[str, Any] | None = None
 
     def __str__(self) -> str:  # pragma: no cover - trivial
-        # Prefer 'message' attr when present for nicer stringification
-        return getattr(self, "message", super().__str__())
+        return str(self.message) if self.message is not None else super().__str__()
 
     def to_dict(self) -> dict[str, Any]:
-        # Default representation if subclass doesn't implement its own
-        return {
-            "error": str(self),
-            "error_code": getattr(self, "code", "HLPR_ERROR"),
-            "details": getattr(self, "details", None),
-        }
+        return {"error": str(self), "error_code": self.code, "details": self.details}
 
     def status_code(self) -> int:
         return status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -38,25 +35,15 @@ class HlprError(Exception):
 
 @dataclass
 class DocumentProcessingError(HlprError):
-    message: str
     code: str = "DOCUMENT_PROCESSING_ERROR"
-    details: dict[str, Any] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"error": self.message, "error_code": self.code, "details": self.details}
 
     def status_code(self) -> int:
         return status.HTTP_400_BAD_REQUEST
 
 
 @dataclass
-class SummarizationError(RuntimeError, HlprError):
-    message: str
+class SummarizationError(HlprError):
     code: str = "SUMMARIZATION_ERROR"
-    details: dict[str, Any] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"error": self.message, "error_code": self.code, "details": self.details}
 
     def status_code(self) -> int:
         return status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -64,12 +51,7 @@ class SummarizationError(RuntimeError, HlprError):
 
 @dataclass
 class ConfigurationError(HlprError):
-    message: str
     code: str = "CONFIGURATION_ERROR"
-    details: dict[str, Any] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"error": self.message, "error_code": self.code, "details": self.details}
 
     def status_code(self) -> int:
         return status.HTTP_500_INTERNAL_SERVER_ERROR

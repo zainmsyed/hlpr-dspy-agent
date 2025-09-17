@@ -28,6 +28,7 @@ class SummaryResult(BaseModel):
     processing_time_ms: int
     hallucinations: list[str] = []
     hallucination_verification: list[dict] = []
+    provider: str | None = None
 
 
 class DocumentSummarizer:
@@ -160,6 +161,7 @@ class DocumentSummarizer:
                 key_points=dspy_result.key_points,
                 processing_time_ms=dspy_result.processing_time_ms,
                 hallucinations=hallucinations,
+                provider=getattr(dspy_result, "provider", None) or self.provider,
             )
 
             # Optionally verify hallucinations (deterministic overlap verification)

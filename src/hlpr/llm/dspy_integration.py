@@ -34,6 +34,7 @@ class DSPySummaryResult(BaseModel):
     summary: str
     key_points: list[str]
     processing_time_ms: int
+    provider: str | None = None
 
 
 class DocumentSummarizationSignature(dspy.Signature):
@@ -503,6 +504,7 @@ class DSPyDocumentSummarizer:
                 summary=summary_text,
                 key_points=key_points,
                 processing_time_ms=processing_time_ms,
+                provider=getattr(self, "provider", None),
             )
 
         except SummarizationError:
