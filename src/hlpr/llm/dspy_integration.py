@@ -500,11 +500,28 @@ class DSPyDocumentSummarizer:
             # objects which cause serializer warnings.
             summary_text = str(getattr(result, "summary", "")).strip()
 
+            # Prefer including the concrete LM identifier (provider/model)
+            # in the result so callers can see exactly which model was used.
+            # For local Ollama-like models, dspy.LM.model typically looks like
+            # 'ollama/gemma3:latest' — normalize this to a clearer form.
+            provider_id = None
+            try:
+                lm_model = getattr(self._lm_config, "model", None)
+                if isinstance(lm_model, str) and lm_model:
+                    # Convert 'ollama/gemma3:latest' -> 'ollama:gemma3:latest'
+                    if "/" in lm_model:
+                        parts = lm_model.split("/", 1)
+                        provider_id = f"{parts[0]}:{parts[1]}"
+                    else:
+                        provider_id = lm_model
+            except Exception:
+                provider_id = None
+
             return DSPySummaryResult(
                 summary=summary_text,
                 key_points=key_points,
                 processing_time_ms=processing_time_ms,
-                provider=getattr(self, "provider", None),
+                provider=provider_id or getattr(self, "provider", None),
             )
 
         except SummarizationError:
