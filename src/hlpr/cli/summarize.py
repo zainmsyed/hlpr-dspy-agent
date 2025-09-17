@@ -415,6 +415,10 @@ def _summarize_with_progress(  # noqa: PLR0913
                 )
             else:
                 result = summarizer.summarize_document(document)
+        except HlprError:
+            # Let domain-specific errors propagate so the outer handler can
+            # map them to the appropriate exit codes.
+            raise
         except Exception as e:
             err_msg = f"Failed to generate summary: {e}"
             desc = err_msg

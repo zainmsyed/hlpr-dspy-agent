@@ -16,6 +16,10 @@ import dspy
 from pydantic import BaseModel
 
 from hlpr.config import CONFIG
+from hlpr.exceptions import (
+    ConfigurationError,
+    SummarizationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +132,7 @@ class DSPyDocumentSummarizer:
         if self.provider == "openai":
             if not self.api_key:
                 msg = "API key required for OpenAI provider"
-                raise ValueError(msg)
+                raise ConfigurationError(msg)
             return dspy.LM(
                 model=f"openai/{self.model}",
                 api_key=self.api_key,
@@ -138,7 +142,7 @@ class DSPyDocumentSummarizer:
         if self.provider == "anthropic":
             if not self.api_key:
                 msg = "API key required for Anthropic provider"
-                raise ValueError(msg)
+                raise ConfigurationError(msg)
             return dspy.LM(
                 model=f"anthropic/{self.model}",
                 api_key=self.api_key,
@@ -149,7 +153,7 @@ class DSPyDocumentSummarizer:
             # Support for Groq API
             if not self.api_key:
                 msg = "API key required for Groq provider"
-                raise ValueError(msg)
+                raise ConfigurationError(msg)
             return dspy.LM(
                 model=f"groq/{self.model}",
                 api_key=self.api_key,
@@ -160,7 +164,7 @@ class DSPyDocumentSummarizer:
             # Support for Together AI
             if not self.api_key:
                 msg = "API key required for Together AI provider"
-                raise ValueError(msg)
+                raise ConfigurationError(msg)
             return dspy.LM(
                 model=f"together/{self.model}",
                 api_key=self.api_key,
@@ -177,7 +181,7 @@ class DSPyDocumentSummarizer:
         msg = (
             f"Unsupported provider: {self.provider}. Supported: {supported_providers}"
         )
-        raise ValueError(msg)
+        raise ConfigurationError(msg)
 
     @contextmanager
     def _dspy_context(self):
@@ -222,35 +226,12 @@ class DSPyDocumentSummarizer:
         Extracted from the main summarize() method to reduce cyclomatic
         complexity and allow focused unit testing.
         """
-        # LOCAL provider: allow longer startup/warmup times.
+        # LOCAL provider: do not enforce time-based timeouts. Local models
+        # can legitimately take longer to start/complete; block and let the
+        # underlying call run to completion. Any exceptions will propagate and
+        # be handled by the caller's retry logic.
         if self.provider == "local":
-            # Allow a short fast-fail window, then wait up to the configured
-            # overall timeout. If the overall timeout elapses, raise RuntimeError
-            # to match test expectations.
-            try:
-                if self.fast_fail_seconds is not None:
-                    return future.result(timeout=self.fast_fail_seconds)
-                return future.result(timeout=self.timeout)
-            except FutureTimeoutError:
-                elapsed = time.time() - start_time
-                remaining = max(self.timeout - elapsed, 0.0)
-                if remaining <= 0:
-                    timeout_msg = (
-                        "DSPy summarization did not complete within the configured "
-                        "timeout; aborting."
-                    )
-                    logger.warning(timeout_msg)
-                    raise RuntimeError(timeout_msg) from None
-                # wait remaining time, then raise if still no result
-                try:
-                    return future.result(timeout=remaining)
-                except FutureTimeoutError:
-                    timeout_msg = (
-                        "DSPy summarization did not complete within the configured "
-                        "timeout; aborting."
-                    )
-                    logger.warning(timeout_msg)
-                    raise RuntimeError(timeout_msg) from None
+            return future.result()
 
         # Non-local providers: enforce configured timeout
         if self.fast_fail_seconds is None:
@@ -276,7 +257,7 @@ class DSPyDocumentSummarizer:
                     "timeout; aborting."
                 )
                 logger.warning(timeout_msg)
-                raise RuntimeError(timeout_msg) from None
+                raise SummarizationError(timeout_msg) from None
 
     @staticmethod
     def _normalize_key_points(key_points):
@@ -440,13 +421,13 @@ class DSPyDocumentSummarizer:
         """
         if provider not in cls.get_supported_providers():
             msg = f"Unsupported provider: {provider}"
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
 
         # Cloud providers require API key
         cloud_providers = ["openai", "anthropic", "groq", "together"]
         if provider in cloud_providers and not api_key:
             msg = f"API key required for {provider} provider"
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
 
         return True
 
@@ -486,7 +467,7 @@ class DSPyDocumentSummarizer:
 
         try:
             with ThreadPoolExecutor(max_workers=1) as executor:
-                max_attempts = 2
+                max_attempts = 3
                 result = None
 
                 for attempt in range(1, max_attempts + 1):
@@ -524,8 +505,8 @@ class DSPyDocumentSummarizer:
                 processing_time_ms=processing_time_ms,
             )
 
-        except RuntimeError:
-            # Re-raise runtime errors (including timeout)
+        except SummarizationError:
+            # Re-raise summarization-specific errors (including timeout)
             raise
         except Exception as exc:
             # If the run didn't timeout but produced an unexpectedly long
@@ -534,12 +515,12 @@ class DSPyDocumentSummarizer:
             # inputs in constrained environments.
             if len(text) > 100000:
                 timeout_err_msg = "DSPy summarization timed out"
-                raise RuntimeError(timeout_err_msg) from exc
+                raise SummarizationError(timeout_err_msg) from exc
             processing_time_ms = int((time.time() - start_time) * 1000)
             err_msg = "DSPy summarization failed"
             logger.exception(err_msg)
             # Preserve original exception context
-            raise RuntimeError(err_msg) from exc
+            raise SummarizationError(err_msg) from exc
 
     def optimize_prompts(self, examples: list[dict]) -> None:  # noqa: ARG002
         """Optimize summarization prompts using MIPRO.

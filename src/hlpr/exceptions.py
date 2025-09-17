@@ -50,7 +50,7 @@ class DocumentProcessingError(HlprError):
 
 
 @dataclass
-class SummarizationError(HlprError):
+class SummarizationError(RuntimeError, HlprError):
     message: str
     code: str = "SUMMARIZATION_ERROR"
     details: dict[str, Any] | None = None

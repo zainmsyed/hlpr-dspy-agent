@@ -69,8 +69,14 @@ class DocumentSummarizer:
         self.api_key = api_key
         self.max_tokens = max_tokens
         self.temperature = temperature
-        # Use centralized default when None provided
-        self.timeout = timeout if timeout is not None else CONFIG.default_timeout
+        # Use centralized default when None provided. For local provider we
+        # prefer no timeout (wait indefinitely) unless an explicit timeout
+        # was provided by the caller. This prevents spurious timeouts for
+        # local models which may legitimately take longer to generate.
+        if timeout is not None:
+            self.timeout = timeout
+        else:
+            self.timeout = None if provider == "local" else CONFIG.default_timeout
         self.progress_tracker = progress_tracker or create_progress_tracker()
         self.no_fallback = no_fallback
         self.verify_hallucinations_flag = verify_hallucinations
@@ -120,8 +126,13 @@ class DocumentSummarizer:
 
         try:
             result = self._summarize_with_dspy(document)
-        except Exception:  # pragma: no cover - fallback path
+        except Exception as exc:  # pragma: no cover - fallback path
             logger.exception("Summarization via DSPy failed")
+            # If provider is local we should abort after DSPy retries have
+            # been exhausted rather than silently falling back. Also respect
+            # the `no_fallback` option which forces failure propagation.
+            if self.provider == "local" or self.no_fallback:
+                raise
             return self._handle_summarization_failure(document)
         else:
             return result
