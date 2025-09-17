@@ -16,6 +16,12 @@ from hlpr.api.utils import safe_serialize
 from hlpr.config import CONFIG
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
+from hlpr.exceptions import (
+    ConfigurationError,
+    DocumentProcessingError,
+    HlprError,
+    SummarizationError,
+)
 from hlpr.models.document import Document
 
 logger = logging.getLogger(__name__)
@@ -296,7 +302,7 @@ def _extract_meeting_items(text: str) -> tuple[list[str], list[str]]:
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple validation paths
+async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestrates multiple validation paths
     request: Request,
     file: UploadFile | None = None,
     provider_id: str | None = None,
@@ -401,6 +407,26 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
 
     except HTTPException:
         raise
+    except HlprError as he:
+        # Map domain errors to structured responses
+        if isinstance(he, DocumentProcessingError):
+            status_code = status.HTTP_400_BAD_REQUEST
+        elif isinstance(he, SummarizationError):
+            status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        elif isinstance(he, ConfigurationError):
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        else:
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+        if hasattr(he, "to_dict"):
+            err_body = he.to_dict()
+        else:
+            err_body = {"error": str(he), "error_code": "HLPR_ERROR"}
+
+        raise HTTPException(
+            status_code=status_code,
+            detail=safe_serialize(err_body),
+        ) from he
     except Exception as e:
         processing_time_ms = int((time.time() - start_time) * 1000)
         logger.exception("Failed to process document upload/text")
@@ -503,6 +529,13 @@ async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryRespon
 
     except HTTPException:
         raise
+    except HlprError as he:
+        # Domain error -> structured response
+        logger.info("Domain error while summarizing text: %s", he)
+        raise HTTPException(
+            status_code=he.status_code(),
+            detail=safe_serialize(he.to_dict()),
+        ) from he
     except Exception as e:
         processing_time_ms = int((time.time() - start_time) * 1000)
         logger.exception("Failed to process text summarization")
@@ -583,6 +616,10 @@ async def summarize_meeting_endpoint(request: Request) -> MeetingSummaryResponse
             summary_result = summarizer.summarize_text(overview)
 
         key_points = getattr(summary_result, "key_points", []) or []
+    except HlprError as he:
+        # Known domain errors -> record and return a reasonable fallback
+        logger.info("Domain error in meeting summarizer: %s", he)
+        key_points = []
     except Exception:
         # In case summarizer fails, fall back to simple heuristics
         logger.exception("Meeting summarization failed, using fallback heuristics")

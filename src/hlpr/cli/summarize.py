@@ -13,6 +13,12 @@ from rich.text import Text
 from hlpr.config import CONFIG
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
+from hlpr.exceptions import (
+    ConfigurationError,
+    DocumentProcessingError,
+    HlprError,
+    SummarizationError,
+)
 from hlpr.models.document import Document
 
 # Create typer app for summarize commands
@@ -141,6 +147,20 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
 
     except typer.Exit:
         raise
+    except HlprError as he:
+        # Map domain errors to CLI exit codes for clearer automation handling
+        if isinstance(he, DocumentProcessingError):
+            console.print(f"[red]Document error:[/red] {he}")
+            raise typer.Exit(6) from he
+        if isinstance(he, SummarizationError):
+            console.print(f"[red]Summarization error:[/red] {he}")
+            raise typer.Exit(5) from he
+        if isinstance(he, ConfigurationError):
+            console.print(f"[red]Configuration error:[/red] {he}")
+            raise typer.Exit(2) from he
+        # Fallback for generic HlprError
+        console.print(f"[red]Error:[/red] {he}")
+        raise typer.Exit(3) from he
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
         raise typer.Exit(4) from e

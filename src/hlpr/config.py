@@ -4,14 +4,16 @@ Provides a small dataclass `HlprConfig` with environment-driven defaults so
 other modules can import and use a single source of truth for timeouts and
 size limits.
 """
+
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 
+from hlpr.config_helpers import _float_or_none, _parse_bounded_int
 
-@dataclass
+
+@dataclass(frozen=False)
 class HlprConfig:
     """Configuration values for hlpr.
 
@@ -39,65 +41,39 @@ class HlprConfig:
         - HLPR_DEFAULT_FAST_FAIL_SECONDS (float seconds or empty for None)
         - HLPR_ALLOWED_ORIGINS (comma-separated list)
         """
-        logger = logging.getLogger(__name__)
-
-        def _parse_positive_int(env_name: str, default: int) -> int:
-            val = os.getenv(env_name)
-            if not val:
-                return default
-            try:
-                parsed = int(val)
-            except ValueError:
-                logger.warning(
-                    "%s=%r is not an integer; using default %d",
-                    env_name,
-                    val,
-                    default,
-                )
-                return default
-            if parsed <= 0:
-                logger.warning(
-                    "%s=%r must be positive; using default %d",
-                    env_name,
-                    val,
-                    default,
-                )
-                return default
-            return parsed
-
-        def _float_or_none(env_name: str, default: float | None) -> float | None:
-            val = os.getenv(env_name)
-            if not val:
-                return default
-            try:
-                return float(val)
-            except ValueError:
-                logger.warning(
-                    "%s=%r is not a float; using default %r",
-                    env_name,
-                    val,
-                    default,
-                )
-                return default
-
         allowed = os.getenv("HLPR_ALLOWED_ORIGINS")
-        allowed_list = [s.strip() for s in allowed.split(",")] if allowed else None
+        if allowed:
+            allowed_list = [s.strip() for s in allowed.split(",") if s.strip()]
+            if not allowed_list:
+                allowed_list = None
+        else:
+            allowed_list = None
 
         return cls(
-            max_file_size=_parse_positive_int(
-                "HLPR_MAX_FILE_SIZE", cls.max_file_size,
+            # Allow reasonable upper bounds to avoid accidental resource exhaustion
+            max_file_size=_parse_bounded_int(
+                "HLPR_MAX_FILE_SIZE",
+                cls.max_file_size,
+                max_value=500 * 1024 * 1024,
             ),
-            max_text_length=_parse_positive_int(
-                "HLPR_MAX_TEXT_LENGTH", cls.max_text_length,
+            max_text_length=_parse_bounded_int(
+                "HLPR_MAX_TEXT_LENGTH",
+                cls.max_text_length,
+                max_value=50 * 1024 * 1024,
             ),
-            max_memory_file_size=_parse_positive_int(
-                "HLPR_MAX_MEMORY_FILE_SIZE", cls.max_memory_file_size,
+            max_memory_file_size=_parse_bounded_int(
+                "HLPR_MAX_MEMORY_FILE_SIZE",
+                cls.max_memory_file_size,
+                max_value=200 * 1024 * 1024,
             ),
-            default_timeout=_parse_positive_int(
-                "HLPR_DEFAULT_TIMEOUT", cls.default_timeout,
+            default_timeout=_parse_bounded_int(
+                "HLPR_DEFAULT_TIMEOUT",
+                cls.default_timeout,
+                max_value=300,
             ),
             default_fast_fail_seconds=_float_or_none(
-                "HLPR_DEFAULT_FAST_FAIL_SECONDS", cls.default_fast_fail_seconds,
+                "HLPR_DEFAULT_FAST_FAIL_SECONDS",
+                cls.default_fast_fail_seconds,
             ),
             allowed_origins=allowed_list,
         )

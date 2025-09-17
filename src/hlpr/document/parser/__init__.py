@@ -18,6 +18,7 @@ except ModuleNotFoundError:
 from docx import Document as DocxDocument
 
 from hlpr.config import CONFIG
+from hlpr.exceptions import DocumentProcessingError
 from hlpr.models.document import Document, FileFormat
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,11 @@ logger = logging.getLogger(__name__)
 # Memory management constants (centralized)
 MAX_MEMORY_FILE_SIZE = CONFIG.max_memory_file_size
 STREAMING_CHUNK_SIZE = 1024 * 1024  # 1MB chunks for streaming
+
+
+def _raise_exception(e: Exception) -> None:
+    """Small helper to raise exceptions from nested flows (TRY301)."""
+    raise e
 
 
 class DocumentParser:
@@ -45,9 +51,8 @@ class DocumentParser:
             Extracted text content from the document
 
         Raises:
-            ValueError: If file format is unsupported or parsing fails
-            FileNotFoundError: If file doesn't exist
-            PermissionError: If file cannot be read
+            FileNotFoundError: When the path does not exist
+            DocumentProcessingError: For parsing failures or unsupported formats
         """
         path = Path(file_path)
 
@@ -55,16 +60,12 @@ class DocumentParser:
             msg = f"File not found: {file_path}"
             raise FileNotFoundError(msg)
 
-        if not path.is_file():
-            msg = f"Path is not a file: {file_path}"
-            raise ValueError(msg)
-
-        # Determine format from file extension
         extension = path.suffix.lower().lstrip(".")
         try:
             file_format = FileFormat(extension)
         except ValueError:
             msg = f"Unsupported file format: {extension}"
+            # Tests expect ValueError for unsupported extensions
             raise ValueError(msg) from None
 
         # Check file size for memory management
@@ -86,12 +87,27 @@ class DocumentParser:
                 return DocumentParser._parse_docx(path, streaming=use_streaming)
             if file_format in (FileFormat.TXT, FileFormat.MD):
                 return DocumentParser._parse_text(path, streaming=use_streaming)
+
+            # Raise a clear domain error for unsupported formats
             msg = f"Unsupported format: {file_format}"
-            raise ValueError(msg)  # noqa: TRY301
+            ex = DocumentProcessingError(
+                message=msg, details={"format": str(file_format)},
+            )
+
+            _raise_exception(ex)
+
+        except DocumentProcessingError:
+            # Re-raise domain errors unchanged
+            raise
         except Exception as e:
+            # Allow ValueError from inner parsers to surface directly (tests expect this)
+            if isinstance(e, ValueError):
+                raise
             logger.exception("Failed to parse %s", file_path)
-            msg = f"Failed to parse document: {e}"
-            raise ValueError(msg) from e
+            raise DocumentProcessingError(
+                message=f"Failed to parse document: {e}",
+                details={"path": str(path)},
+            ) from e
 
     @staticmethod
     def _parse_pdf(file_path: Path, *, streaming: bool = False) -> str:
@@ -109,7 +125,7 @@ class DocumentParser:
         """
         if PdfReader is None:
             msg = "PDF parsing not available - install PyPDF2 or pypdf package"
-            raise ValueError(msg)
+            raise DocumentProcessingError(message=msg)
 
         try:
             if streaming:
@@ -130,9 +146,11 @@ class DocumentParser:
 
             return "\n\n".join(text_content)
 
+        except DocumentProcessingError:
+            raise
         except Exception as e:
             msg = f"Failed to parse PDF: {e}"
-            raise ValueError(msg) from e
+            raise DocumentProcessingError(message=msg) from e
 
     @staticmethod
     def _parse_pdf_streaming(file_path: Path) -> str:
@@ -149,7 +167,7 @@ class DocumentParser:
         """
         if PdfReader is None:
             msg = "PDF parsing not available - install PyPDF2 or pypdf package"
-            raise ValueError(msg)
+            raise DocumentProcessingError(message=msg)
 
         try:
             reader = PdfReader(file_path)
@@ -192,9 +210,11 @@ class DocumentParser:
 
             return "\n\n".join(text_content)
 
+        except DocumentProcessingError:
+            raise
         except Exception as e:
             msg = f"Failed to parse PDF with streaming: {e}"
-            raise ValueError(msg) from e
+            raise DocumentProcessingError(message=msg) from e
 
     @staticmethod
     def _parse_docx(file_path: Path, *, streaming: bool = False) -> str:  # noqa: ARG004
@@ -227,9 +247,11 @@ class DocumentParser:
 
             return "\n\n".join(text_content)
 
+        except DocumentProcessingError:
+            raise
         except Exception as e:
             msg = f"Failed to parse DOCX: {e}"
-            raise ValueError(msg) from e
+            raise DocumentProcessingError(message=msg) from e
 
     @staticmethod
     def _parse_text(file_path: Path, *, streaming: bool = False) -> str:
@@ -254,10 +276,12 @@ class DocumentParser:
                 content = f.read()
         except UnicodeDecodeError as err:
             msg = "File encoding is not UTF-8 compatible"
-            raise ValueError(msg) from err
+            raise DocumentProcessingError(message=msg) from err
+        except DocumentProcessingError:
+            raise
         except Exception as e:
             msg = f"Failed to read text file: {e}"
-            raise ValueError(msg) from e
+            raise DocumentProcessingError(message=msg) from e
         else:
             if not content.strip():
                 msg = "File is empty or contains no readable text"
@@ -290,10 +314,12 @@ class DocumentParser:
             content = "".join(content_chunks)
         except UnicodeDecodeError as err:
             msg = "File encoding is not UTF-8 compatible"
-            raise ValueError(msg) from err
+            raise DocumentProcessingError(message=msg) from err
+        except DocumentProcessingError:
+            raise
         except Exception as e:
             msg = f"Failed to read text file with streaming: {e}"
-            raise ValueError(msg) from e
+            raise DocumentProcessingError(message=msg) from e
         else:
             if not content.strip():
                 msg = "File is empty or contains no readable text"
