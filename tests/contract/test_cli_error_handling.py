@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_cli_error_handling_exit_codes():
@@ -6,7 +5,7 @@ def test_cli_error_handling_exit_codes():
 
     Check basic validators return expected tuples for invalid input.
     """
-    from hlpr.cli.validators import validate_file_path, validate_config
+    from hlpr.cli.validators import validate_config, validate_file_path
 
     assert validate_file_path("") == (False, "empty path")
     assert validate_config({}) == (True, "ok")

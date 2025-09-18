@@ -1,9 +1,14 @@
 """Output renderers (stubs) for CLI TUI feature."""
 from abc import ABC, abstractmethod
 from typing import Any
-import json
 
-__all__ = ["BaseRenderer", "RichRenderer", "JsonRenderer", "MarkdownRenderer", "PlainTextRenderer"]
+__all__ = [
+    "BaseRenderer",
+    "JsonRenderer",
+    "MarkdownRenderer",
+    "PlainTextRenderer",
+    "RichRenderer",
+]
 
 
 class BaseRenderer(ABC):
@@ -14,20 +19,24 @@ class BaseRenderer(ABC):
 
 class RichRenderer(BaseRenderer):
     def render(self, data: Any) -> str:
-        raise NotImplementedError("RichRenderer.render not implemented")
+        msg = "RichRenderer.render not implemented"
+        raise NotImplementedError(msg)
 
 
 class JsonRenderer(BaseRenderer):
     def render(self, data: Any) -> str:
         # Use json.dumps at implementation time
-        raise NotImplementedError("JsonRenderer.render not implemented")
+        msg = "JsonRenderer.render not implemented"
+        raise NotImplementedError(msg)
 
 
 class MarkdownRenderer(BaseRenderer):
     def render(self, data: Any) -> str:
-        raise NotImplementedError("MarkdownRenderer.render not implemented")
+        msg = "MarkdownRenderer.render not implemented"
+        raise NotImplementedError(msg)
 
 
 class PlainTextRenderer(BaseRenderer):
     def render(self, data: Any) -> str:
-        raise NotImplementedError("PlainTextRenderer.render not implemented")
+        msg = "PlainTextRenderer.render not implemented"
+        raise NotImplementedError(msg)

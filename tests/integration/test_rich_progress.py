@@ -9,6 +9,7 @@ def test_rich_progress_integration():
     from hlpr.cli.rich_display import ProgressTracker
 
     pt = ProgressTracker()
-    assert hasattr(pt, "start") and hasattr(pt, "advance")
+    assert hasattr(pt, "start")
+    assert hasattr(pt, "advance")
     with pytest.raises(NotImplementedError):
         pt.start()

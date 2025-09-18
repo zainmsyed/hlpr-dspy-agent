@@ -5,81 +5,88 @@ validation and will be expanded as features are implemented.
 """
 from __future__ import annotations
 
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
+from datetime import datetime  # noqa: TC003
 from enum import Enum
-from datetime import datetime
-from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
 
 __all__ = [
+    "FileSelection",
     "InteractiveSessionModel",
     "OutputPreferences",
-    "ProcessingState",
-    "ProcessingResult",
-    "ProcessingMetadata",
     "ProcessingError",
-    "FileSelection",
+    "ProcessingMetadata",
+    "ProcessingResult",
+    "ProcessingState",
     "ProviderOption",
 ]
 
 
 class ProviderOption(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     default: bool = False
 
 
 class FileSelection(BaseModel):
     path: str
-    size_bytes: Optional[int] = None
-    mime_type: Optional[str] = None
+    size_bytes: int | None = None
+    mime_type: str | None = None
 
     @field_validator("path")
+    @classmethod
     def path_must_be_non_empty(cls, v: str) -> str:
         if not isinstance(v, str) or not v.strip():
-            raise ValueError("path must be a non-empty string")
+            msg = "path must be a non-empty string"
+            raise ValueError(msg)
         return v
 
 
 class ProcessingError(BaseModel):
-    code: Optional[str] = None
+    code: str | None = None
     message: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 class ProcessingMetadata(BaseModel):
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    duration_seconds: float | None = None
 
     @field_validator("duration_seconds")
-    def duration_non_negative(cls, v: Optional[float]) -> Optional[float]:
+    @classmethod
+    def duration_non_negative(cls, v: float | None) -> float | None:
         if v is not None and v < 0:
-            raise ValueError("duration_seconds must be non-negative")
+            msg = "duration_seconds must be non-negative"
+            raise ValueError(msg)
         return v
 
 
 class ProcessingResult(BaseModel):
     file: FileSelection
-    summary: Optional[str] = None
-    metadata: Optional[ProcessingMetadata] = None
-    error: Optional[ProcessingError] = None
+    summary: str | None = None
+    metadata: ProcessingMetadata | None = None
+    error: ProcessingError | None = None
 
 
 class ProcessingState(BaseModel):
     total_files: NonNegativeInt = 0
     processed_files: NonNegativeInt = 0
-    errors: List[ProcessingError] = Field(default_factory=list)
+    errors: list[ProcessingError] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_counts(self):
         if self.processed_files > self.total_files:
-            raise ValueError("processed_files cannot exceed total_files")
+            msg = "processed_files cannot exceed total_files"
+            raise ValueError(msg)
         return self
 
     @property
     def completion_percentage(self) -> float:
-        return (self.processed_files / self.total_files * 100) if self.total_files > 0 else 0.0
+        if self.total_files > 0:
+            return float(self.processed_files / self.total_files * 100)
+        return 0.0
 
     @property
     def is_complete(self) -> bool:
@@ -96,18 +103,20 @@ class OutputFormat(str, Enum):
 class OutputPreferences(BaseModel):
     format: OutputFormat = Field(default=OutputFormat.RICH, description="Output format")
     include_metadata: bool = True
-    max_summary_chars: Optional[int] = None
+    max_summary_chars: int | None = None
 
     @field_validator("max_summary_chars")
-    def max_summary_non_negative(cls, v: Optional[int]) -> Optional[int]:
+    @classmethod
+    def max_summary_non_negative(cls, v: int | None) -> int | None:
         if v is not None and v <= 0:
-            raise ValueError("max_summary_chars must be positive")
+            msg = "max_summary_chars must be positive"
+            raise ValueError(msg)
         return v
 
 
 class InteractiveSessionModel(BaseModel):
-    session_id: Optional[str] = None
-    provider: Optional[ProviderOption] = None
+    session_id: str | None = None
+    provider: ProviderOption | None = None
     preferences: OutputPreferences = Field(default_factory=OutputPreferences)
-    files: List[FileSelection] = Field(default_factory=list)
+    files: list[FileSelection] = Field(default_factory=list)
     state: ProcessingState = Field(default_factory=ProcessingState)
