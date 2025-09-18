@@ -1,6 +1,6 @@
 # Implementation Plan: Enhanced CLI/TUI for Document Summarization
 
-**Branch**: `003-cli-tui-of` | **Date**: September 18, 2025 | **Spec**: [spec.md](./spec.md)
+**Branch**: `cli-tui-of-document-summarizer` | **Date**: September 18, 2025 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/home/zain/Documents/coding/hlpr/specs/003-cli-tui-of/spec.md`
 
 ## Execution Flow (/plan command scope)

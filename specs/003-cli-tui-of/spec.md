@@ -1,6 +1,6 @@
 # Feature Specification: Enhanced CLI/TUI for Document Summarization
 
-**Feature Branch**: `003-cli-tui-of`  
+**Feature Branch**: `cli-tui-of-document-summarizer`  
 **Created**: September 18, 2025  
 **Status**: Draft  
 **Input**: User description: "cli/tui of the documents summarization"
