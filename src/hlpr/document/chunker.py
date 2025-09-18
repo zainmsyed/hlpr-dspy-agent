@@ -8,6 +8,8 @@ import logging
 import re
 from abc import ABC, abstractmethod
 
+from hlpr.exceptions import ValidationError
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +54,7 @@ class SentenceBasedChunker(ChunkingStrategy):
         """
         if chunk_size <= overlap:
             msg = "Chunk size must be greater than overlap"
-            raise ValueError(msg)
+            raise ValidationError(message=msg)
 
         # Split into sentences
         sentences = re.split(self.sentence_split_pattern, text)
@@ -119,7 +121,7 @@ class ParagraphBasedChunker(ChunkingStrategy):
         """
         if chunk_size <= overlap:
             msg = "Chunk size must be greater than overlap"
-            raise ValueError(msg)
+            raise ValidationError(message=msg)
 
         # Split into paragraphs
         paragraphs = re.split(self.paragraph_split_pattern, text)
@@ -178,7 +180,7 @@ class FixedSizeChunker(ChunkingStrategy):
         """
         if chunk_size <= overlap:
             msg = "Chunk size must be greater than overlap"
-            raise ValueError(msg)
+            raise ValidationError(message=msg)
 
         chunks = []
         start = 0
@@ -238,7 +240,7 @@ class TokenBasedChunker(ChunkingStrategy):
         """
         if chunk_size <= overlap:
             msg = "Chunk size must be greater than overlap"
-            raise ValueError(msg)
+            raise ValidationError(message=msg)
 
         # Tokenize the entire text
         tokens = self.tokenizer(text)
@@ -315,7 +317,7 @@ class DocumentChunker:
                 f"Unsupported chunking strategy: {strategy_name}. "
                 f"Available: {available}"
             )
-            raise ValueError(msg)
+            raise ValidationError(message=msg)
 
         chunker = self.strategies[strategy_name]
 

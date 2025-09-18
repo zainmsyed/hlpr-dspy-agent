@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from hlpr.document.parser import DocumentParser
+from hlpr.exceptions import DocumentProcessingError
 
 
 def write_tmp(path: Path, content: str) -> None:
@@ -38,7 +39,10 @@ def test_empty_file_raises(tmp_path):
     p = tmp_path / "empty.txt"
     write_tmp(p, "   \n\n   ")
 
-    with pytest.raises(ValueError, match=r"empty|no readable text|File is empty"):
+    with pytest.raises(
+        DocumentProcessingError,
+        match=r"empty|no readable text|File is empty",
+    ):
         DocumentParser.parse_file(p)
 
 
@@ -46,5 +50,5 @@ def test_unsupported_extension_raises(tmp_path):
     p = tmp_path / "file.xyz"
     write_tmp(p, "content")
 
-    with pytest.raises(ValueError, match=r"Unsupported file format"):
+    with pytest.raises(DocumentProcessingError, match=r"Unsupported file format"):
         DocumentParser.parse_file(p)

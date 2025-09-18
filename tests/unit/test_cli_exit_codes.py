@@ -12,19 +12,27 @@ from hlpr.exceptions import (
 runner = CliRunner()
 
 
+def _parse_short(_p):
+    return "short"
+
+
 def test_summarization_error_maps_to_exit_5(monkeypatch, tmp_path):
     """If the summarizer raises SummarizationError the CLI should exit 5."""
     test_file = tmp_path / "test_document.txt"
     test_file.write_text("short content")
 
     # Parser returns extracted text (short so summarize_document() is used)
+    def _parse_short(_p):
+        return "short"
+
     monkeypatch.setattr(
-        "hlpr.document.parser.DocumentParser.parse_file", lambda p: "short",
+        "hlpr.document.parser.DocumentParser.parse_file", _parse_short,
     )
 
     # Summarizer raises SummarizationError during summarize_document
-    def _raise(self, *a, **k):
-        raise SummarizationError("summarizer failed")
+    def _raise(_self, *_, **__):
+        msg = "summarizer failed"
+        raise SummarizationError(msg)
 
     monkeypatch.setattr(
         "hlpr.document.summarizer.DocumentSummarizer.summarize_document", _raise,
@@ -39,9 +47,13 @@ def test_document_processing_error_maps_to_exit_6(monkeypatch, tmp_path):
     test_file = tmp_path / "test_document.txt"
     test_file.write_text("content")
 
+    def _raise_parse(_p):
+        msg = "parse failed"
+        raise DocumentProcessingError(msg)
+
     monkeypatch.setattr(
         "hlpr.document.parser.DocumentParser.parse_file",
-        lambda p: (_ for _ in ()).throw(DocumentProcessingError("parse failed")),
+        _raise_parse,
     )
 
     result = runner.invoke(app, ["summarize", "document", str(test_file)])
@@ -54,12 +66,13 @@ def test_configuration_error_maps_to_exit_2(monkeypatch, tmp_path):
     test_file.write_text("content")
 
     monkeypatch.setattr(
-        "hlpr.document.parser.DocumentParser.parse_file", lambda p: "short",
+        "hlpr.document.parser.DocumentParser.parse_file", _parse_short,
     )
 
     # Make the constructor raise ConfigurationError
-    def _bad_init(self, *a, **k):
-        raise ConfigurationError("bad config")
+    def _bad_init(_self, *_, **__):
+        msg = "bad config"
+        raise ConfigurationError(msg)
 
     monkeypatch.setattr(
         "hlpr.document.summarizer.DocumentSummarizer.__init__", _bad_init,
@@ -75,14 +88,16 @@ def test_generic_hlpr_error_maps_to_exit_3(monkeypatch, tmp_path):
     test_file.write_text("content")
 
     monkeypatch.setattr(
-        "hlpr.document.parser.DocumentParser.parse_file", lambda p: "short",
+        "hlpr.document.parser.DocumentParser.parse_file", _parse_short,
     )
 
-    def _raise_generic(self, *a, **k):
-        raise HlprError("generic")
+    def _raise_generic(_self, *_, **__):
+        msg = "generic"
+        raise HlprError(msg)
 
     monkeypatch.setattr(
-        "hlpr.document.summarizer.DocumentSummarizer.summarize_document", _raise_generic,
+        "hlpr.document.summarizer.DocumentSummarizer.summarize_document",
+        _raise_generic,
     )
 
     result = runner.invoke(app, ["summarize", "document", str(test_file)])

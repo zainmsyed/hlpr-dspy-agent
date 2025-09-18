@@ -362,8 +362,24 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
             extracted_text = DocumentParser.parse_file(file_path)
             desc = "Document parsed successfully"
             progress.update(parse_task, completed=True, description=desc)
+        except DocumentProcessingError as e:
+            # Domain parser errors: map unsupported formats to exit code 2,
+            # other document processing failures map to exit code 6.
+            msg = str(e).lower()
+            if "unsupported" in msg or "unsupported file format" in msg:
+                err_msg = f"Unsupported file format: {e}"
+                desc = f"Unsupported format: {e}"
+                progress.update(parse_task, completed=True, description=desc)
+                console.print(f"[red]Error:[/red] {err_msg}")
+                raise typer.Exit(2) from e
+            err_msg = f"Failed to parse document: {e}"
+            desc = err_msg
+            progress.update(parse_task, completed=True, description=desc)
+            console.print(f"[red]Error:[/red] {err_msg}")
+            raise typer.Exit(6) from e
         except ValueError as e:
-            # Distinguish unsupported format vs general parsing failure
+            # Backwards-compatible handling for older code paths that raised
+            # ValueError for unsupported formats — keep existing behavior.
             msg = str(e).lower()
             if "unsupported" in msg or "unsupported file format" in msg:
                 err_msg = f"Unsupported file format: {e}"

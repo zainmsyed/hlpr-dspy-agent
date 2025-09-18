@@ -20,6 +20,7 @@ from hlpr.exceptions import (
     ConfigurationError,
     SummarizationError,
 )
+from hlpr.logging_utils import build_extra, new_context
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +273,91 @@ class DSPyDocumentSummarizer:
             return [str(p).strip() for p in key_points if str(p).strip()]
         return [str(key_points)]
 
+    def _normalize_provider_id(self) -> str | None:
+        """Return a normalized provider identifier string or None.
+
+        Normalizes forms like 'ollama/gemma3:latest' to
+        'ollama:gemma3:latest' for clearer logging and diagnostics.
+        """
+        try:
+            lm_model = getattr(self._lm_config, "model", None)
+            if isinstance(lm_model, str) and lm_model:
+                if "/" in lm_model:
+                    parts = lm_model.split("/", 1)
+                    return f"{parts[0]}:{parts[1]}"
+                return lm_model
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    def _attempt_summarization_with_retries(
+        self,
+        text: str,
+        start_time: float,
+        log_ctx,
+    ):
+        """Run the summarizer with a small retry loop and return the result.
+
+        This extracts the ThreadPoolExecutor + retry logic from summarize()
+        to reduce the parent method's cyclomatic complexity.
+        """
+        def _call_summarizer():
+            return self._invoke_summarizer(text)
+
+        max_attempts = 3
+        # Exceptions we'll treat as retryable during summarization attempts
+        retry_exceptions = (SummarizationError, RuntimeError, TimeoutError, OSError)
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            result = None
+            for attempt in range(1, max_attempts + 1):
+                future = executor.submit(_call_summarizer)
+                try:
+                    result = self._result_from_future(future, start_time)
+                    if result is not None:
+                        break
+                except retry_exceptions as exc:
+                    logger.warning(
+                        "DSPy summarization attempt %d failed: %s",
+                        attempt,
+                        exc,
+                        extra=build_extra(
+                            log_ctx,
+                            attempt=attempt,
+                            provider=self.provider,
+                        ),
+                    )
+                    if attempt == max_attempts:
+                        raise
+                    # otherwise continue to next attempt
+        return result
+
+    def _build_summary_result(self, result, text: str, start_time: float, log_ctx):
+        """Normalize the raw DSPy result into a DSPySummaryResult."""
+        key_points = self._normalize_key_points(result.key_points)
+
+        processing_time_ms = int((time.time() - start_time) * 1000)
+
+        summary_text = str(getattr(result, "summary", "")).strip()
+
+        provider_id = self._normalize_provider_id() or getattr(self, "provider", None)
+
+        logger.info(
+            "DSPy summarization completed",
+            extra=build_extra(
+                log_ctx,
+                provider=provider_id,
+                processing_time_ms=processing_time_ms,
+                input_length=len(text),
+            ),
+        )
+
+        return DSPySummaryResult(
+            summary=summary_text,
+            key_points=key_points,
+            processing_time_ms=processing_time_ms,
+            provider=provider_id,
+        )
+
     class VerificationSignature(dspy.Signature):
         """DSPy signature for claim verification.
 
@@ -443,7 +529,7 @@ class DSPyDocumentSummarizer:
             test_text = "Hello, this is a test."
             result = self.summarize(test_text)
             return len(result.summary.strip()) > 0
-        except Exception:
+        except (SummarizationError, RuntimeError, TimeoutError, OSError):
             logger.exception("Provider connectivity test failed")
             return False
 
@@ -461,68 +547,12 @@ class DSPyDocumentSummarizer:
             DSPySummaryResult with summary and key points
         """
         start_time = time.time()
-
-        def _call_summarizer():
-            # Call the DSPy summarizer synchronously inside the worker
-            return self._invoke_summarizer(text)
-
+        # Create a per-call logging context so we can correlate logs
+        log_ctx = new_context()
         try:
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                max_attempts = 3
-                result = None
+            result = self._attempt_summarization_with_retries(text, start_time, log_ctx)
 
-                for attempt in range(1, max_attempts + 1):
-                    future = executor.submit(_call_summarizer)
-                    try:
-                        result = self._result_from_future(future, start_time)
-                        if result is not None:
-                            break
-                    except Exception as exc:
-                        # On failure, retry once (useful for transient errors)
-                        logger.warning(
-                            "DSPy summarization attempt %d failed: %s",
-                            attempt,
-                            exc,
-                        )
-                        if attempt == max_attempts:
-                            # Re-raise the last exception to be handled by
-                            # the outer exception handlers below
-                            raise
-                        # Otherwise, continue to the next attempt
-
-            # Normalize key_points into a clean list
-            key_points = self._normalize_key_points(result.key_points)
-
-            processing_time_ms = int((time.time() - start_time) * 1000)
-
-            # Defensive coercion: ensure summary is a plain string so that
-            # Pydantic does not attempt to serialize LLM-specific Message
-            # objects which cause serializer warnings.
-            summary_text = str(getattr(result, "summary", "")).strip()
-
-            # Prefer including the concrete LM identifier (provider/model)
-            # in the result so callers can see exactly which model was used.
-            # For local Ollama-like models, dspy.LM.model typically looks like
-            # 'ollama/gemma3:latest' — normalize this to a clearer form.
-            provider_id = None
-            try:
-                lm_model = getattr(self._lm_config, "model", None)
-                if isinstance(lm_model, str) and lm_model:
-                    # Convert 'ollama/gemma3:latest' -> 'ollama:gemma3:latest'
-                    if "/" in lm_model:
-                        parts = lm_model.split("/", 1)
-                        provider_id = f"{parts[0]}:{parts[1]}"
-                    else:
-                        provider_id = lm_model
-            except Exception:
-                provider_id = None
-
-            return DSPySummaryResult(
-                summary=summary_text,
-                key_points=key_points,
-                processing_time_ms=processing_time_ms,
-                provider=provider_id or getattr(self, "provider", None),
-            )
+            return self._build_summary_result(result, text, start_time, log_ctx)
 
         except SummarizationError:
             # Re-raise summarization-specific errors (including timeout)
@@ -535,7 +565,6 @@ class DSPyDocumentSummarizer:
             if len(text) > 100000:
                 timeout_err_msg = "DSPy summarization timed out"
                 raise SummarizationError(timeout_err_msg) from exc
-            processing_time_ms = int((time.time() - start_time) * 1000)
             err_msg = "DSPy summarization failed"
             logger.exception(err_msg)
             # Preserve original exception context

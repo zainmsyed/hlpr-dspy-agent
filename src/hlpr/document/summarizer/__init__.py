@@ -14,6 +14,10 @@ from hlpr.document.progress import (
     ProgressTracker,
     create_progress_tracker,
 )
+from hlpr.exceptions import (
+    SummarizationError,
+    ValidationError,
+)
 from hlpr.llm.dspy_integration import DSPyDocumentSummarizer
 from hlpr.models.document import Document
 
@@ -119,7 +123,7 @@ class DocumentSummarizer:
         """
         if not document.extracted_text:
             msg = "Document has no extracted text to summarize"
-            raise ValueError(msg)
+            raise SummarizationError(message=msg)
 
         # If DSPy isn't available, use a simple fallback summarizer to allow tests
         if not self.use_dspy or self.dspy_summarizer is None:
@@ -127,7 +131,7 @@ class DocumentSummarizer:
 
         try:
             result = self._summarize_with_dspy(document)
-        except Exception as exc:  # pragma: no cover - fallback path
+        except Exception:  # pragma: no cover - fallback path
             logger.exception("Summarization via DSPy failed")
             # If provider is local we should abort after DSPy retries have
             # been exhausted rather than silently falling back. Also respect
@@ -204,7 +208,7 @@ class DocumentSummarizer:
         """
         if not text.strip():
             msg = "Text content is empty"
-            raise ValueError(msg)
+            raise ValidationError(message=msg)
 
         # Add title context if provided
         document_text = text
@@ -270,7 +274,7 @@ class DocumentSummarizer:
         """
         if not document.extracted_text:
             msg = "Document has no extracted text to summarize"
-            raise ValueError(msg)
+            raise SummarizationError(message=msg)
 
         text = document.extracted_text
 
@@ -339,7 +343,7 @@ class DocumentSummarizer:
             msg = "Failed to summarize large document"
             logger.exception(msg)
             err_msg = "Large document summarization failed"
-            raise ValueError(err_msg) from e
+            raise SummarizationError(message=err_msg) from e
 
     def _fallback_summarize(self, text: str) -> SummaryResult:
         """A simple fallback summarizer used when DSPy or model is unavailable.

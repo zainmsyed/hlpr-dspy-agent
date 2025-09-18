@@ -65,8 +65,13 @@ class DocumentParser:
             file_format = FileFormat(extension)
         except ValueError:
             msg = f"Unsupported file format: {extension}"
-            # Tests expect ValueError for unsupported extensions
-            raise ValueError(msg) from None
+            # Raise domain-specific error for unsupported format
+            raise (
+                DocumentProcessingError(
+                    message=msg,
+                    details={"extension": extension},
+                )
+            ) from None
 
         # Check file size for memory management
         file_size = path.stat().st_size
@@ -100,7 +105,7 @@ class DocumentParser:
             # Re-raise domain errors unchanged
             raise
         except Exception as e:
-            # Allow ValueError from inner parsers to surface directly (tests expect this)
+            # Allow ValueError from inner parsers to surface (tests expect this)
             if isinstance(e, ValueError):
                 raise
             logger.exception("Failed to parse %s", file_path)
@@ -142,7 +147,7 @@ class DocumentParser:
 
             if not text_content:
                 msg = "No text content found in PDF (may be image-based)"
-                raise ValueError(msg)  # noqa: TRY301
+                raise DocumentProcessingError(message=msg)  # noqa: TRY301
 
             return "\n\n".join(text_content)
 
@@ -206,7 +211,7 @@ class DocumentParser:
 
             if not text_content:
                 msg = "No text content found in PDF (may be image-based)"
-                raise ValueError(msg)  # noqa: TRY301
+                raise DocumentProcessingError(message=msg)  # noqa: TRY301
 
             return "\n\n".join(text_content)
 
@@ -285,7 +290,7 @@ class DocumentParser:
         else:
             if not content.strip():
                 msg = "File is empty or contains no readable text"
-                raise ValueError(msg)
+                raise DocumentProcessingError(message=msg)
             return content
 
     @staticmethod
@@ -323,7 +328,7 @@ class DocumentParser:
         else:
             if not content.strip():
                 msg = "File is empty or contains no readable text"
-                raise ValueError(msg)
+                raise DocumentProcessingError(message=msg)
             return content
 
     @staticmethod

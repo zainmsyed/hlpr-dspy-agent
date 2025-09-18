@@ -1,6 +1,7 @@
 import pytest
 
 from hlpr.document.chunker import Chunker
+from hlpr.exceptions import ValidationError
 
 
 def test_chunker_basic():
@@ -21,5 +22,8 @@ def test_chunker_empty():
 
 def test_chunker_invalid_params():
     # overlap must be less than chunk_size
-    with pytest.raises(ValueError, match="Chunk size must be greater than overlap"):
+    with pytest.raises(
+        ValidationError,
+        match="Chunk size must be greater than overlap",
+    ):
         Chunker(chunk_size=10, overlap=20)

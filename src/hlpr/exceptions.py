@@ -42,11 +42,26 @@ class DocumentProcessingError(HlprError):
 
 
 @dataclass
-class SummarizationError(HlprError):
+class SummarizationError(HlprError, RuntimeError):
     code: str = "SUMMARIZATION_ERROR"
 
     def status_code(self) -> int:
         return status.HTTP_422_UNPROCESSABLE_ENTITY
+        # Adding RuntimeError as a superclass
+
+
+@dataclass
+class ValidationError(HlprError):
+    """Raised for user/input validation errors (non-Pydantic field validation).
+
+    Note: keep Pydantic field validators raising built-in ValueError so
+    Pydantic reports proper field errors. Use this ValidationError for
+    higher-level checks where a domain-level validation error is clearer.
+    """
+    code: str = "VALIDATION_ERROR"
+
+    def status_code(self) -> int:
+        return status.HTTP_400_BAD_REQUEST
 
 
 @dataclass

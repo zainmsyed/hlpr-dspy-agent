@@ -1,3 +1,4 @@
+
 import pytest
 
 from hlpr.document.summarizer import DocumentSummarizer
@@ -20,9 +21,8 @@ def test_local_provider_defaults_to_no_timeout(tmp_path):
     # fallback summary. Accept either outcome.
     try:
         result = s.summarize_document(doc)
-    except Exception as exc:
-        # If DSPy is available but failing, we expect an exception type
-        # from DSPy integration (SummarizationError or underlying runtime).
-        assert isinstance(exc, Exception)
+    except RuntimeError:
+        # DSPy integration may raise a runtime-style error in some environments
+        pytest.skip("DSPy runtime error during summarization")
     else:
         assert hasattr(result, "summary")
