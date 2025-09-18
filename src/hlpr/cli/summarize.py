@@ -1,6 +1,7 @@
 """Summarize command for hlpr CLI."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,10 @@ from hlpr.exceptions import (
     HlprError,
     SummarizationError,
 )
+from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
+
+logger = logging.getLogger(__name__)
 
 # Create typer app for summarize commands
 app = typer.Typer(help="Document summarization commands")
@@ -29,7 +33,7 @@ console = Console()
 
 
 @app.command("document")
-def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
+def summarize_document(  # noqa: PLR0913,C901 - CLI keeps multiple options for UX and is intentionally complex
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
     provider: str = typer.Option(
         "local",
@@ -109,6 +113,15 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
         raise typer.Exit(1)
 
     try:
+        log_ctx = new_context()
+        start_extra = {"provider": provider}
+        if CONFIG.include_file_paths:
+            start_extra["file"] = str(path)
+
+        logger.info(
+            "CLI document summarization started",
+            extra=build_safe_extra(log_ctx, **start_extra),
+        )
         document, extracted_text = _parse_with_progress(file_path, verbose)
 
         # Initialize summarizer (use CONFIG.default_timeout when not provided)
@@ -139,6 +152,18 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
 
         # Display results
         _display_summary(document, result, output_format)
+        complete_extra = {"provider": provider}
+        if CONFIG.include_file_paths:
+            complete_extra["file"] = str(path)
+        if CONFIG.performance_logging:
+            complete_extra["processing_time_ms"] = (
+                getattr(result, "processing_time_ms", None)
+            )
+
+        logger.info(
+            "CLI document summarization completed",
+            extra=build_safe_extra(log_ctx, **complete_extra),
+        )
 
         # Save to file if requested
         if save:
@@ -160,9 +185,17 @@ def summarize_document(  # noqa: PLR0913 - CLI keeps multiple options for UX
             raise typer.Exit(2) from he
         # Fallback for generic HlprError
         console.print(f"[red]Error:[/red] {he}")
+        logger.info(
+            "CLI domain error",
+            extra=build_extra(log_ctx, error=str(he), error_type=type(he).__name__),
+        )
         raise typer.Exit(3) from he
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
+        logger.exception(
+            "Unexpected CLI error",
+            extra=build_extra(log_ctx, error=str(e)),
+        )
         raise typer.Exit(4) from e
 
 

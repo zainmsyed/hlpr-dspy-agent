@@ -8,9 +8,10 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from starlette import status
 
 from hlpr.api.utils import safe_serialize
 from hlpr.config import CONFIG
@@ -22,31 +23,15 @@ from hlpr.exceptions import (
     HlprError,
     SummarizationError,
 )
+from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
 
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Use centralized configuration
+# Local aliases for configuration-driven maxima used throughout this module
 MAX_FILE_SIZE = CONFIG.max_file_size
 MAX_TEXT_LENGTH = CONFIG.max_text_length
-
-router = APIRouter()
-
-
-class SummarizeTextRequest(BaseModel):
-    """Request model for text-based summarization."""
-
-    text_content: str = Field(..., description="Raw text content to summarize")
-    title: str | None = Field(None, description="Document title")
-    provider_id: str | None = Field(
-        "local", description="AI provider to use",
-    )
-    temperature: float | None = Field(
-        None, description="Sampling temperature for the model (0.0-1.0)",
-    )
-    format: str | None = Field(
-        "json", description="Output format", pattern="^(txt|md|json)$",
-    )
 
 
 class DocumentSummaryResponse(BaseModel):
@@ -90,6 +75,17 @@ class MeetingSummaryResponse(BaseModel):
         default_factory=list, description="Detected participants",
     )
     processing_time_ms: int = Field(..., description="Time taken to process")
+
+
+
+class SummarizeTextRequest(BaseModel):
+    """Request model for text summarization endpoints."""
+
+    text_content: str
+    title: str | None = None
+    provider_id: str | None = None
+    temperature: float | None = None
+    format: str | None = Field("json", pattern="^(txt|md|json)$")
 
 
 def _raise_http(status_code: int, error: ErrorResponse) -> None:
@@ -302,7 +298,7 @@ def _extract_meeting_items(text: str) -> tuple[list[str], list[str]]:
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestrates multiple validation paths
+async def summarize_document(  # noqa: C901, PLR0912, PLR0915 - endpoint orchestrates multiple validation paths
     request: Request,
     file: UploadFile | None = None,
     provider_id: str | None = None,
@@ -314,6 +310,7 @@ async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestra
     Supports PDF, DOCX, TXT, and MD files.
     """
     start_time = time.time()
+    log_ctx = new_context()
 
     # Read the raw body once to detect whether JSON was sent alongside a file
     try:
@@ -342,6 +339,16 @@ async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestra
 
         if file is not None and file.filename:
             file_content = await file.read()
+            # Conditionally include file path info based on configuration
+            file_extra = {}
+            if CONFIG.include_file_paths:
+                file_extra["file_name"] = file.filename
+            file_extra["file_size"] = len(file_content)
+
+            logger.info(
+                "Received document upload",
+                extra=build_safe_extra(log_ctx, **file_extra),
+            )
             resp = _process_file_upload(
                 filename=file.filename,
                 file_content=file_content,
@@ -349,9 +356,21 @@ async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestra
                 temperature=temperature,
                 start_time=start_time,
             )
+            logger.info(
+                "File processed successfully",
+                extra=build_safe_extra(
+                    log_ctx,
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                    provider=provider_id or "local",
+                ),
+            )
             resp.format = format_param or resp.format
             content = safe_serialize(resp.model_dump())
-            return JSONResponse(status_code=status.HTTP_200_OK, content=content)
+            response = JSONResponse(status_code=status.HTTP_200_OK, content=content)
+            # Add correlation id header for cross-service tracing when enabled
+            if CONFIG.include_correlation_header:
+                response.headers["X-Correlation-ID"] = log_ctx.correlation_id
+            return response
 
         # Expect JSON with text_content
         try:
@@ -401,9 +420,20 @@ async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestra
             temperature=body_temp,
             start_time=start_time,
         )
+        text_extra = {"provider": provider}
+        if CONFIG.include_text_length:
+            text_extra["input_length"] = len(text_content)
+
+        logger.info(
+            "Text summarization request processed",
+            extra=build_safe_extra(log_ctx, **text_extra),
+        )
         resp.format = resp_format
         content = safe_serialize(resp.model_dump())
-        return JSONResponse(status_code=status.HTTP_200_OK, content=content)
+        response = JSONResponse(status_code=status.HTTP_200_OK, content=content)
+        if CONFIG.include_correlation_header:
+            response.headers["X-Correlation-ID"] = log_ctx.correlation_id
+        return response  # noqa: TRY300 - explicit return consolidated for clarity
 
     except HTTPException:
         raise
@@ -422,14 +452,22 @@ async def summarize_document(  # noqa: C901,PLR0912,PLR0915 - endpoint orchestra
             err_body = he.to_dict()
         else:
             err_body = {"error": str(he), "error_code": "HLPR_ERROR"}
-
+        logger.warning(
+            "Domain error while processing request",
+            extra=build_safe_extra(
+                log_ctx, error=str(he), error_code=getattr(he, "code", "HLPR_ERROR"),
+            ),
+        )
         raise HTTPException(
             status_code=status_code,
             detail=safe_serialize(err_body),
         ) from he
     except Exception as e:
         processing_time_ms = int((time.time() - start_time) * 1000)
-        logger.exception("Failed to process document upload/text")
+        logger.exception(
+            "Failed to process document upload/text",
+            extra=build_extra(log_ctx, processing_time_ms=processing_time_ms),
+        )
         err = ErrorResponse(
             error="Failed to process document",
             error_code="PROCESSING_ERROR",

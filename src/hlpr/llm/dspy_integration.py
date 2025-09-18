@@ -20,7 +20,7 @@ from hlpr.exceptions import (
     ConfigurationError,
     SummarizationError,
 )
-from hlpr.logging_utils import build_extra, new_context
+from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +222,7 @@ class DSPyDocumentSummarizer:
             summarizer = dspy.Predict(DocumentSummarizationSignature)
             return summarizer(document_text=text)
 
-    def _result_from_future(self, future, start_time: float):
+    def _result_from_future(self, future, start_time: float, log_ctx=None):
         """Handle waiting on a future with provider-specific semantics.
 
         Extracted from the main summarize() method to reduce cyclomatic
@@ -258,7 +258,13 @@ class DSPyDocumentSummarizer:
                     "DSPy summarization did not complete within the configured "
                     "timeout; aborting."
                 )
-                logger.warning(timeout_msg)
+                # Prefer provided logging context; fall back to a fresh one.
+                ctx = log_ctx or new_context()
+
+                logger.warning(
+                    timeout_msg,
+                    extra=build_safe_extra(ctx, provider=self.provider),
+                )
                 raise SummarizationError(timeout_msg) from None
 
     @staticmethod
@@ -311,8 +317,9 @@ class DSPyDocumentSummarizer:
             result = None
             for attempt in range(1, max_attempts + 1):
                 future = executor.submit(_call_summarizer)
+
                 try:
-                    result = self._result_from_future(future, start_time)
+                    result = self._result_from_future(future, start_time, log_ctx)
                     if result is not None:
                         break
                 except retry_exceptions as exc:
@@ -320,7 +327,7 @@ class DSPyDocumentSummarizer:
                         "DSPy summarization attempt %d failed: %s",
                         attempt,
                         exc,
-                        extra=build_extra(
+                        extra=build_safe_extra(
                             log_ctx,
                             attempt=attempt,
                             provider=self.provider,
@@ -439,7 +446,10 @@ class DSPyDocumentSummarizer:
                 verifier = dspy.Predict(self.VerificationSignature)
         except Exception:
             # If creating a verifier fails, log and return conservative default
-            logger.exception("Failed to create DSPy verifier in calling thread")
+            logger.exception(
+                "Failed to create DSPy verifier in calling thread",
+                extra=build_extra(new_context(), provider=self.provider),
+            )
             return {
                 "claim": claim,
                 "model_supported": None,
@@ -456,7 +466,10 @@ class DSPyDocumentSummarizer:
                 start_time = time.time()
                 raw = self._result_from_future(future, start_time)
             except Exception:
-                logger.exception("Model-backed verification failed for a claim")
+                logger.exception(
+                    "Model-backed verification failed for a claim",
+                    extra=build_extra(new_context(), provider=self.provider),
+                )
                 return {
                     "claim": claim,
                     "model_supported": None,
@@ -533,7 +546,7 @@ class DSPyDocumentSummarizer:
             logger.exception("Provider connectivity test failed")
             return False
 
-    def summarize(self, text: str) -> DSPySummaryResult:
+    def summarize(self, text: str, log_ctx=None) -> DSPySummaryResult:
         """Summarize document text using DSPy with a cross-platform timeout.
 
         Uses a ThreadPoolExecutor to run the DSPy predict call in a worker
@@ -547,8 +560,10 @@ class DSPyDocumentSummarizer:
             DSPySummaryResult with summary and key points
         """
         start_time = time.time()
-        # Create a per-call logging context so we can correlate logs
-        log_ctx = new_context()
+        # Create or reuse a per-call logging context so we can correlate logs
+        if log_ctx is None:
+            log_ctx = new_context()
+
         try:
             result = self._attempt_summarization_with_retries(text, start_time, log_ctx)
 
@@ -566,7 +581,10 @@ class DSPyDocumentSummarizer:
                 timeout_err_msg = "DSPy summarization timed out"
                 raise SummarizationError(timeout_err_msg) from exc
             err_msg = "DSPy summarization failed"
-            logger.exception(err_msg)
+            logger.exception(
+                err_msg,
+                extra=build_extra(log_ctx, input_length=len(text)),
+            )
             # Preserve original exception context
             raise SummarizationError(err_msg) from exc
 

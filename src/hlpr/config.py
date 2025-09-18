@@ -28,6 +28,11 @@ class HlprConfig:
     default_timeout: int = 30
     default_fast_fail_seconds: float | None = 1.0
     allowed_origins: list[str] | None = None
+    # Logging controls
+    include_file_paths: bool = False
+    include_text_length: bool = True
+    include_correlation_header: bool = True
+    performance_logging: bool = True
 
     @classmethod
     def from_env(cls) -> HlprConfig:
@@ -76,6 +81,19 @@ class HlprConfig:
                 cls.default_fast_fail_seconds,
             ),
             allowed_origins=allowed_list,
+            # Logging flags
+            include_file_paths=(
+                os.getenv("HLPR_INCLUDE_FILE_PATHS", "false").lower() == "true"
+            ),
+            include_text_length=(
+                os.getenv("HLPR_INCLUDE_TEXT_LENGTH", "true").lower() == "true"
+            ),
+            include_correlation_header=(
+                os.getenv("HLPR_INCLUDE_CORRELATION_HEADER", "true").lower() == "true"
+            ),
+            performance_logging=(
+                os.getenv("HLPR_PERFORMANCE_LOGGING", "true").lower() == "true"
+            ),
         )
 
 

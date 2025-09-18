@@ -73,7 +73,6 @@ Design documents from `/home/zain/Documents/coding/hlpr/specs/002-document-artic
 - T014-T017: DSPy integration, chunking, progress tracking, provider integration
 
 **Remaining Tasks: T014-T021**
-```
 
 ## Format: `[ID] [P?] Description`
 - **[P]**: Can run in parallel (different files, no dependencies)
@@ -118,14 +117,14 @@ Single project structure per plan.md:
 - [x] **T020** [P] Document processing documentation in docs/document-processing.md (README updated with temperature docs)
 - [x] **T021** Update quickstart guide with document examples (examples referenced in README)
 - [x] **T022** Hallucination mitigation (basic detector + CLI warnings)
-- [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)
+- [ ] **T023** Verification CLI & flow (opt-in hallucination verification via model)(SKIPPING for now)
 
 ## Phase 3.6: Code Quality & Refactoring (NEW - HIGH PRIORITY)
 - [x] **T024** Complete DSPy verify_claims refactor in src/hlpr/llm/dspy_integration.py
 - [x] **T025** [P] Split API endpoints: create /document/upload and /document/text in src/hlpr/api/summarize.py  
-- [ ] **T026** [P] Centralized configuration management in src/hlpr/config.py
-- [ ] **T027** [P] Custom exception hierarchy in src/hlpr/exceptions.py
-- [ ] **T028** Enhanced structured logging across API and CLI modules
+- [x] **T026** [P] Centralized configuration management in src/hlpr/config.py
+- [x] **T027** [P] Custom exception hierarchy in src/hlpr/exceptions.py
+- [x] **T028** Enhanced structured logging across API and CLI modules
 
 ## Dependencies
 - Tests (T004-T006) before implementation (T007-T013)

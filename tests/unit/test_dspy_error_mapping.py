@@ -1,4 +1,5 @@
 import time
+
 import pytest
 
 from hlpr.exceptions import HlprError, SummarizationError
@@ -13,8 +14,9 @@ def test_result_from_future_timeout_raises_summarization_error():
     # behavior is deterministic across environments and doesn't block the
     # test runner waiting on a real Future that never completes.
     class DummyFuture:
-        def result(self, *a, **k):
-            raise SummarizationError("simulated timeout")
+        def result(self, *_, **__):
+            msg = "simulated timeout"
+            raise SummarizationError(msg)
 
     start = time.time()
     with pytest.raises(SummarizationError):
