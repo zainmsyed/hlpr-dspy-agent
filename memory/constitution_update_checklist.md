@@ -1,85 +1,92 @@
-# Constitution Update Checklist
+# hlpr Constitution Update Checklist
 
-When amending the constitution (`/memory/constitution.md`), ensure all dependent documents are updated to maintain consistency.
+When amending the hlpr constitution (`/memory/constitution.md`), ensure all dependent documents are updated to maintain consistency with the project's core principles: modular architecture, privacy-first design, CLI-first experience, DSPy integration, and modern tooling.
 
 ## Templates to Update
 
 ### When adding/modifying ANY article:
-- [ ] `/templates/plan-template.md` - Update Constitution Check section
-- [ ] `/templates/spec-template.md` - Update if requirements/scope affected
-- [ ] `/templates/tasks-template.md` - Update if new task types needed
-- [ ] `/.claude/commands/plan.md` - Update if planning process changes
-- [ ] `/.claude/commands/tasks.md` - Update if task generation affected
-- [ ] `/CLAUDE.md` - Update runtime development guidelines
+- [ ] `/templates/plan-template.md` - Update Constitution Check section with hlpr principles
+- [ ] `/templates/spec-template.md` - Update if DSPy/LLM requirements affected
+- [ ] `/templates/tasks-template.md` - Update if modular development process changes
+- [ ] `/templates/agent-file-template.md` - Update if new development patterns needed
+- [ ] `/scripts/` - Update automation scripts if tooling requirements change
+- [ ] `/README.md` - Update project overview if core principles affected
 
 ### Article-specific updates:
 
-#### Article I (Library-First):
-- [ ] Ensure templates emphasize library creation
-- [ ] Update CLI command examples
-- [ ] Add llms.txt documentation requirements
+#### Article I (Modular Architecture):
+- [ ] Ensure templates emphasize standalone module creation
+- [ ] Update CLI command examples for modular structure
+- [ ] Add module interface documentation requirements
+- [ ] Update testing templates for independent module testing
 
-#### Article II (CLI Interface):
+#### Article II (Privacy-First Design):
+- [ ] Update templates with local LLM default settings
+- [ ] Add credential security reminders
+- [ ] Include TLS/SSL requirements in network examples
+- [ ] Add data flow transparency requirements
+
+#### Article III (CLI-First Experience):
 - [ ] Update CLI flag requirements in templates
-- [ ] Add text I/O protocol reminders
+- [ ] Add Rich/Typer integration examples
+- [ ] Include interactive vs power mode considerations
+- [ ] Update error handling patterns for user-friendly messages
 
-#### Article III (Test-First):
-- [ ] Update test order in all templates
-- [ ] Emphasize TDD requirements
-- [ ] Add test approval gates
+#### Article IV (DSPy Integration & Optimization):
+- [ ] Update AI workflow templates with DSPy requirements
+- [ ] Add MIPRO optimization reminders
+- [ ] Include provider flexibility examples (local vs cloud)
+- [ ] Update timeout policy documentation
 
-#### Article IV (Integration Testing):
-- [ ] List integration test triggers
-- [ ] Update test type priorities
-- [ ] Add real dependency requirements
-
-#### Article V (Observability):
-- [ ] Add logging requirements to templates
-- [ ] Include multi-tier log streaming
-- [ ] Update performance monitoring sections
-
-#### Article VI (Versioning):
-- [ ] Add version increment reminders
-- [ ] Include breaking change procedures
-- [ ] Update migration requirements
-
-#### Article VII (Simplicity):
-- [ ] Update project count limits
-- [ ] Add pattern prohibition examples
-- [ ] Include YAGNI reminders
+#### Article V (Modern Tooling & Quality):
+- [ ] Update UV dependency management examples
+- [ ] Add Ruff compliance requirements to templates
+- [ ] Include type safety (Pydantic) patterns
+- [ ] Update structured logging requirements
 
 ## Validation Steps
 
 1. **Before committing constitution changes:**
-   - [ ] All templates reference new requirements
-   - [ ] Examples updated to match new rules
-   - [ ] No contradictions between documents
+   - [ ] All templates reference hlpr's modular architecture requirements
+   - [ ] Examples updated to match privacy-first and CLI-first principles
+   - [ ] DSPy integration patterns properly documented
+   - [ ] UV/Ruff tooling requirements included
+   - [ ] No contradictions with local LLM and security requirements
 
 2. **After updating templates:**
-   - [ ] Run through a sample implementation plan
-   - [ ] Verify all constitution requirements addressed
-   - [ ] Check that templates are self-contained (readable without constitution)
+   - [ ] Run through a sample hlpr feature implementation plan
+   - [ ] Verify all constitution principles (modular, privacy, CLI, DSPy, tooling) addressed
+   - [ ] Check that templates work with project venv: `/home/zain/Documents/coding/hlpr/.venv/bin/python`
+   - [ ] Test UV dependency management examples: `uv add`, `uv run`
 
-3. **Version tracking:**
-   - [ ] Update constitution version number
-   - [ ] Note version in template footers
-   - [ ] Add amendment to constitution history
+3. **hlpr-specific validation:**
+   - [ ] Local LLM timeout policies properly documented (no timeout by default)
+   - [ ] Keyring credential storage patterns included
+   - [ ] TLS/SSL requirements for IMAP/email connections documented
+   - [ ] DSPy/MIPRO optimization examples provided
 
-## Common Misses
+## Version tracking:
+- [ ] Update constitution version number
+- [ ] Note version in template footers
+- [ ] Add amendment to constitution history
+- [ ] Update ratification date if major changes
 
-Watch for these often-forgotten updates:
-- Command documentation (`/commands/*.md`)
-- Checklist items in templates
-- Example code/commands
-- Domain-specific variations (web vs mobile vs CLI)
-- Cross-references between documents
+## Common Misses in hlpr Updates
+
+Watch for these often-forgotten hlpr-specific updates:
+- DSPy workflow documentation (`/docs/local-dspy.md`)
+- Email processing security requirements
+- Local LLM endpoint configurations
+- UV dependency management examples
+- Privacy-first data handling patterns
+- CLI interactive vs power mode examples
 
 ## Template Sync Status
 
-Last sync check: 2025-07-16
-- Constitution version: 2.1.1
-- Templates aligned: ❌ (missing versioning, observability details)
+Last sync check: 2025-09-18
+- Constitution version: 1.0.0
+- Templates aligned: ✅ (updated for hlpr modular architecture, privacy-first design, CLI-first experience, DSPy integration, modern tooling)
 
 ---
 
-*This checklist ensures the constitution's principles are consistently applied across all project documentation.*
+*This checklist ensures hlpr's constitution principles are consistently applied across all project documentation and maintains the project's focus on privacy, modularity, and AI-assisted workflows.*
