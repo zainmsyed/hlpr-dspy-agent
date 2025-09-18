@@ -18,6 +18,49 @@ uvx run ruff format  # Formatting
 ```
 always use uv add for adding dependencies to pyproject.toml
 
+## Enhanced CLI/TUI Features (Feature 003)
+
+### Rich and Typer Integration
+The project uses Rich and Typer for beautiful, interactive CLI experiences:
+
+- **Guided Mode**: `hlpr summarize` provides step-by-step interactive workflow
+- **Rich Progress**: Progress bars with phases (parsing → chunking → summarizing)
+- **Rich Panels**: Color-coded output for summaries, key points, and metadata
+- **Interactive Prompts**: File selection, provider choice, configuration options
+- **Error Handling**: Rich-formatted error panels with actionable suggestions
+
+### CLI Architecture
+```
+src/hlpr/cli/
+├── interactive.py      # Guided mode prompts and workflows
+├── rich_display.py     # Rich formatting, panels, progress bars
+├── validators.py       # Input validation with rich error messages
+├── batch.py           # Multi-file processing logic
+└── renderers.py       # Output format renderers
+```
+
+### Key Components
+- `InteractiveSession`: Manages guided mode state and workflow
+- `RichDisplay`: Handles Rich-based formatting and progress
+- `ProgressTracker`: Phase-aware progress with Rich.Progress
+- `BatchProcessor`: Parallel processing of multiple files
+- Output formats: rich (default), txt, md, json
+
+## Commands
+```bash
+# Guided interactive mode
+hlpr summarize
+
+# Direct command with Rich output  
+hlpr summarize document file.pdf --format rich
+
+# Batch processing with parallel execution
+hlpr summarize document *.pdf --batch --verbose
+
+# Save output with custom formatting
+hlpr summarize document file.pdf --save --output summary.md --format md
+```
+
 # Local DSPy / Local model developer notes
 
 This project supports multiple LLM providers (local, openai, anthropic, groq, together).
