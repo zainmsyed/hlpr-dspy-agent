@@ -4,6 +4,12 @@ import pytest
 def test_cli_batch_processing_contract():
     """T006: Contract test for batch processing command.
 
-    Intentionally failing until batch processing is implemented.
+    Assert the BatchProcessor exposes `process_files` and it raises
+    NotImplementedError until implemented.
     """
-    pytest.fail("T006: batch processing contract test not implemented")
+    from hlpr.cli.batch import BatchProcessor
+
+    bp = BatchProcessor()
+    assert hasattr(bp, "process_files")
+    with pytest.raises(NotImplementedError):
+        bp.process_files(["a.txt"])

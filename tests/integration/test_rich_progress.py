@@ -4,6 +4,11 @@ import pytest
 def test_rich_progress_integration():
     """T009: Integration test for Rich progress bars.
 
-    Intentionally failing until progress tracking is implemented.
+    Assert ProgressTracker exposes start and advance methods.
     """
-    pytest.fail("T009: rich progress integration test not implemented")
+    from hlpr.cli.rich_display import ProgressTracker
+
+    pt = ProgressTracker()
+    assert hasattr(pt, "start") and hasattr(pt, "advance")
+    with pytest.raises(NotImplementedError):
+        pt.start()

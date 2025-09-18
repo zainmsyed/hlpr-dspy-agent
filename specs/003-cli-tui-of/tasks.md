@@ -80,6 +80,16 @@ Notes:
 - [ ] T018 [P] FileSelection model in `src/hlpr/cli/models.py`
 - [ ] T019 [P] ProviderOption model in `src/hlpr/cli/models.py`
 
+### Progress
+- [x] T012-T019 Completed: Implemented pydantic models for all CLI data entities in `src/hlpr/cli/models.py`.
+
+Notes on hardening:
+- Added `OutputFormat` enum and validated `OutputPreferences.format`.
+- Replaced string timestamp fields with `datetime` and validated durations.
+- Added `field_validator` for `path` and `max_summary_chars` and `model_validator` to ensure `processed_files <= total_files`.
+- Added computed properties `completion_percentage` and `is_complete` to `ProcessingState`.
+- Expanded unit tests to cover validation errors and serialization (`tests/unit/test_cli_models.py`).
+
 ## Phase 3.4: CLI Infrastructure
 - [ ] T020 RichDisplay class with progress bars and panels in `src/hlpr/cli/rich_display.py`
 - [ ] T021 ProgressTracker for phase-aware progress in `src/hlpr/cli/rich_display.py`

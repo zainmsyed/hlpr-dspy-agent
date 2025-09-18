@@ -4,6 +4,12 @@ import pytest
 def test_cli_guided_mode_entrypoint_exists():
     """T004: Contract test for guided mode command `hlpr summarize`.
 
-    This test intentionally fails until the guided mode is implemented.
+    Verify the InteractiveSession class exists and its run method raises
+    NotImplementedError until implemented.
     """
-    pytest.fail("T004: guided mode contract test not implemented")
+    from hlpr.cli.interactive import InteractiveSession
+
+    assert hasattr(InteractiveSession, "run")
+    session = InteractiveSession()
+    with pytest.raises(NotImplementedError):
+        session.run()

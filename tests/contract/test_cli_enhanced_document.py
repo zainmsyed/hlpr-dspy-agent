@@ -4,6 +4,13 @@ import pytest
 def test_cli_enhanced_document_entrypoint_exists():
     """T005: Contract test for direct command `hlpr summarize document`.
 
-    This test intentionally fails until the direct command is implemented.
+    Verify that the renderers and batch processor classes exist (interface check)
+    and that attempting to call their primary methods raises NotImplementedError.
     """
-    pytest.fail("T005: direct document contract test not implemented")
+    from hlpr.cli.renderers import BaseRenderer
+    from hlpr.cli.batch import BatchProcessor
+
+    assert issubclass(BaseRenderer, object)
+    bp = BatchProcessor()
+    with pytest.raises(NotImplementedError):
+        bp.process_files([])

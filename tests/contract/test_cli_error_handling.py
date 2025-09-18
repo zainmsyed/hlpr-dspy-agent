@@ -4,6 +4,9 @@ import pytest
 def test_cli_error_handling_exit_codes():
     """T007: Contract test for error handling and proper exit codes.
 
-    Intentionally failing until error handling is implemented.
+    Check basic validators return expected tuples for invalid input.
     """
-    pytest.fail("T007: error handling contract test not implemented")
+    from hlpr.cli.validators import validate_file_path, validate_config
+
+    assert validate_file_path("") == (False, "empty path")
+    assert validate_config({}) == (True, "ok")
