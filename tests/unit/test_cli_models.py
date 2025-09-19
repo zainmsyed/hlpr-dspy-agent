@@ -1,3 +1,5 @@
+from datetime import UTC
+
 from hlpr.cli.models import (
     FileSelection,
     InteractiveSessionModel,
@@ -22,11 +24,10 @@ def test_file_selection_and_provider_option():
 def test_processing_models_and_error():
     pe = ProcessingError(code="E1", message="failed to parse", details={"line": 10})
     from datetime import datetime
-    from datetime import timezone
 
     pm = ProcessingMetadata(
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
         duration_seconds=0.5,
     )
     fs = FileSelection(path="docs/examples/welcome_to_wrtr.md")

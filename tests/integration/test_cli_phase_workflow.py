@@ -8,18 +8,18 @@ def test_interactive_session_with_phases(tmp_path):
     """Test InteractiveSession.run_with_phases method."""
     console = Console(record=True)
     display = RichDisplay(console=console)
-    
+
     p = tmp_path / "test.txt"
     p.write_text("test content")
-    
+
     sess = InteractiveSession(display=display)
     res = sess.run_with_phases(
-        str(p), 
-        {"provider": "local", "output_format": "md", "steps": 2}
+        str(p),
+        {"provider": "local", "output_format": "md", "steps": 2},
     )
-    
+
     assert res["status"] == "ok"
-    
+
     # Check that console output contains phase information
     out = console.export_text()
     assert "Complete" in out

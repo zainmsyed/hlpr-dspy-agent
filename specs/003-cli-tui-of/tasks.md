@@ -141,10 +141,57 @@ Notes on hardening:
 **Test Results**: 28/28 CLI tests passing, all linting issues resolved.
 
 ## Phase 3.5: Output Renderers (Parallel)
-- [ ] T029 [P] RichRenderer for terminal output in `src/hlpr/cli/renderers.py`
-- [ ] T030 [P] JsonRenderer for JSON output in `src/hlpr/cli/renderers.py`
-- [ ] T031 [P] MarkdownRenderer for MD output in `src/hlpr/cli/renderers.py`
-- [ ] T032 [P] PlainTextRenderer for TXT output in `src/hlpr/cli/renderers.py`
+- [x] T029 [P] RichRenderer for terminal output in `src/hlpr/cli/renderers.py`
+- [x] T030 [P] JsonRenderer for JSON output in `src/hlpr/cli/renderers.py`
+- [x] T031 [P] MarkdownRenderer for MD output in `src/hlpr/cli/renderers.py`
+- [x] T032 [P] PlainTextRenderer for TXT output in `src/hlpr/cli/renderers.py`
+
+### Progress - Phase 3.5 Completed ✅
+**Comprehensive output renderer implementation with enhanced features:**
+
+**T029-T032 Completed**: Implemented all four output renderers with production-ready features:
+
+**RichRenderer** - Rich terminal output with enhanced formatting:
+- Rich panels with color-coded borders (green for summaries, red for errors, cyan for file info)
+- Metadata tables with styled columns and proper formatting
+- Support for console injection for testing
+- Handles lists of results with separators
+- Graceful handling of minimal data (always shows file information)
+
+**JsonRenderer** - Structured JSON output:
+- Proper JSON formatting with configurable indentation and sorting
+- Metadata wrapper with renderer info, timestamps, and format version
+- Handles Pydantic model serialization via `model_dump(mode='json')`
+- Robust error handling for non-serializable objects
+- UTC timezone-aware timestamps
+
+**MarkdownRenderer** - Documentation-ready Markdown:
+- Full document structure with headers, sections, and proper formatting
+- File information, summary, error, and metadata sections
+- JSON code blocks for complex data (error details)
+- Unicode and emoji support preserved
+- Footer with generation timestamp
+
+**PlainTextRenderer** - Simple text output:
+- Clean, readable format for basic terminals
+- Structured sections (SUMMARY, ERROR, FILE INFO, METADATA)  
+- Proper line formatting and separators
+- Handles special characters and unicode correctly
+- Minimal dependencies for maximum compatibility
+
+**Enhanced Features Beyond Scope:**
+- **Unicode Support**: All renderers handle Chinese characters, emojis, and symbols correctly
+- **Data Integrity**: Special characters in filenames and content are preserved
+- **Timezone Awareness**: All timestamps use UTC timezone consistently  
+- **Error Resilience**: Graceful handling of missing data and edge cases
+- **Testing Coverage**: 22/22 renderer tests passing (19 unit + 3 integration)
+
+**Files modified:**
+- `src/hlpr/cli/renderers.py` - Complete implementation of all four renderers
+- `tests/unit/test_cli_renderers.py` - Comprehensive unit tests for all renderers
+- `tests/integration/test_cli_renderers.py` - Integration tests with realistic data
+
+**Test Results**: 50/50 CLI tests passing (28 previous + 22 new renderer tests), critical linting issues resolved.
 
 ## Phase 3.6: Batch Processing & Integration
 - [ ] T033 BatchProcessor for parallel file processing in `src/hlpr/cli/batch.py`
