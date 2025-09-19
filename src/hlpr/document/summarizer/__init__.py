@@ -42,7 +42,7 @@ class DocumentSummarizer:
     and chunking strategies for large documents.
     """
 
-    def __init__(  # noqa: PLR0913 - initializer exposes config knobs for UX
+    def __init__(
         self,
         provider: str = "local",
         model: str = "gemma3:latest",

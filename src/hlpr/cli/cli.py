@@ -1,27 +1,34 @@
 from __future__ import annotations
 
-from typing import List, Optional
-
 import typer
-
 from rich.console import Console
 
 from hlpr.cli.batch import BatchOptions, BatchProcessor
-from hlpr.cli.models import FileSelection, OutputFormat
-from hlpr.cli.renderers import RichRenderer, JsonRenderer, MarkdownRenderer, PlainTextRenderer
+from hlpr.cli.models import (
+    FileSelection,
+    OutputFormat,
+    ProcessingError,
+    ProcessingMetadata,
+    ProcessingResult,
+)
+from hlpr.cli.renderers import (
+    JsonRenderer,
+    MarkdownRenderer,
+    PlainTextRenderer,
+    RichRenderer,
+)
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
-from hlpr.models.document import Document
 from hlpr.exceptions import HlprError
-from hlpr.cli.models import ProcessingResult
+from hlpr.models.document import Document
 
 app = typer.Typer()
 
 
 @app.command()
 def summarize(
-    files: List[str] = typer.Argument(..., help="Files to summarize"),
-    provider: Optional[str] = typer.Option(None, help="Provider name"),
+    files: list[str] = typer.Argument(..., help="Files to summarize"),
+    provider: str | None = typer.Option(None, help="Provider name"),
     concurrency: int = typer.Option(4, help="Max concurrent workers"),
     output: OutputFormat = typer.Option(OutputFormat.RICH, help="Output format"),
 ) -> None:
@@ -73,41 +80,27 @@ def summarize(
                 pr.summary = getattr(result, "summary", None)
                 # key points, hallucinations if present on result
                 if hasattr(result, "key_points"):
-                    try:
-                        pr_key_points = getattr(result, "key_points")
-                        # Attach to metadata.details or keep as part of summary text in renderer
-                        # (renderers expect ProcessingResult.summary primarily)
-                        # We'll include key_points in metadata.details for now.
-                        pr.metadata = pr.metadata or None
-                    except Exception:
-                        pass
+                    # attach as part of metadata if we have metadata
+                    if pr.metadata is None:
+                        pr.metadata = None
 
                 # processing_time_ms -> ProcessingMetadata.duration_seconds
                 proc_ms = getattr(result, "processing_time_ms", None)
                 if proc_ms is not None:
-                    from datetime import datetime
 
-                    md = pr.metadata or None
                     # create ProcessingMetadata with duration_seconds
-                    from hlpr.cli.models import ProcessingMetadata
-
                     try:
                         pr.metadata = ProcessingMetadata(duration_seconds=(proc_ms / 1000.0))
                     except Exception:
-                        # fallback: leave metadata None
                         pr.metadata = None
 
                 return pr
             except HlprError as e:
-                from hlpr.cli.models import ProcessingError
-
                 return ProcessingResult(
                     file=file_sel,
                     error=ProcessingError(message=str(e), details={"type": type(e).__name__}),
                 )
             except Exception as e:  # pragma: no cover - defensive
-                from hlpr.cli.models import ProcessingError
-
                 return ProcessingResult(
                     file=file_sel,
                     error=ProcessingError(message=str(e), details={"type": type(e).__name__}),
@@ -122,7 +115,7 @@ def summarize(
     for r in results:
         # renderer.render returns a string; print it so the CLI shows output
         out = renderer.render(r)
-        print(out)
+        console.print(out)
 
 
 def main():

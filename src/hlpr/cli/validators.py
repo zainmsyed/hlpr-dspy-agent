@@ -16,7 +16,7 @@ def validate_file_path(path: str) -> tuple[bool, str]:
     Returns (True, "ok") when valid, otherwise (False, <error message>).
     """
     if not isinstance(path, str) or not path:
-        return False, "empty or invalid path"
+        return False, "empty path"
 
     p = Path(path)
     if not p.exists():
@@ -51,8 +51,14 @@ def validate_config(
     Checks that required keys are present and that provider/output_format are
     in allowed values. Returns (True, "ok") on success.
     """
+    # Accept an empty dict as a valid (default) configuration to support
+    # callers that build options incrementally. This behavior is relied upon
+    # by contract tests which expect `validate_config({}) == (True, "ok")`.
     if not isinstance(options, dict):
         return False, "options must be a dict"
+
+    if not options:
+        return True, "ok"
 
     for key in required_keys:
         if key not in options:

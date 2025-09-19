@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, Optional
 
 from rich.console import Console
 
-from hlpr.cli.models import FileSelection, ProcessingResult
-from hlpr.cli.rich_display import PhaseTracker, ProgressTracker, RichDisplay
+from hlpr.cli.models import FileSelection, ProcessingError, ProcessingResult
+from hlpr.cli.rich_display import PhaseTracker, ProgressTracker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ LOGGER = logging.getLogger(__name__)
 @dataclass
 class BatchOptions:
     max_workers: int = 4
-    console: Optional[Console] = None
+    console: Console | None = None
     save_partial_on_interrupt: bool = True
 
 
@@ -28,7 +29,7 @@ class BatchProcessor:
     from provider implementations.
     """
 
-    def __init__(self, options: Optional[BatchOptions] = None):
+    def __init__(self, options: BatchOptions | None = None):
         self.options = options or BatchOptions()
         self.console = self.options.console or Console()
         self.interrupted: bool = False
@@ -36,16 +37,17 @@ class BatchProcessor:
     def process_files(
         self,
         files: Iterable[FileSelection],
-        summarize_fn: Optional[Callable[[FileSelection], ProcessingResult]] = None,
-    ) -> List[ProcessingResult]:
+        summarize_fn: Callable[[FileSelection], ProcessingResult] | None = None,
+    ) -> list[ProcessingResult]:
         # If no summarize function is provided the caller didn't implement
         # the integration yet — surface this as NotImplementedError so the
         # contract tests can assert the TODO state.
         if summarize_fn is None:
-            raise NotImplementedError("summarize_fn must be provided")
+            msg = "summarize_fn must be provided"
+            raise NotImplementedError(msg)
 
         files_list = list(files)
-        results: List[ProcessingResult] = []
+        results: list[ProcessingResult] = []
 
         phase_tracker = PhaseTracker(["validate", "summarize", "render"])
 
@@ -71,23 +73,26 @@ class BatchProcessor:
 
         try:
             with concurrent.futures.ThreadPoolExecutor(
-                max_workers=self.options.max_workers
-            ) as exc:
-                future_to_file = {exc.submit(summarize_fn, f): f for f in valid_files}
-                for i, fut in enumerate(concurrent.futures.as_completed(future_to_file)):
+                max_workers=self.options.max_workers,
+            ) as executor:
+                future_to_file = {
+                    executor.submit(summarize_fn, f): f
+                    for f in valid_files
+                }
+                for fut in concurrent.futures.as_completed(future_to_file):
                     f = future_to_file[fut]
                     try:
                         res = fut.result()
                     except Exception as excp:  # pragma: no cover - defensive
-                        # Create a ProcessingResult capturing the error in the
-                        # typed ProcessingError model so callers can inspect
-                        # partial failures programmatically.
+                        # We catch BaseException here to ensure that KeyboardInterrupt
+                        # raised inside worker threads is captured and converted to a
+                        # ProcessingResult so the caller can see partial failures.
+                        # This is narrow and intentional: we re-raise later for
+                        # non-recoverable signals at the outer level.
                         LOGGER.exception("Error summarizing %s", f.path)
-                        from hlpr.cli.models import ProcessingError
-
                         res = ProcessingResult(file=f)
                         res.error = ProcessingError(
-                            message=str(excp), details={"type": type(excp).__name__}
+                            message=str(excp), details={"type": type(excp).__name__},
                         )
                     results.append(res)
                     prog.advance(1)
@@ -99,29 +104,30 @@ class BatchProcessor:
                 if not self.options.save_partial_on_interrupt:
                     raise
                 LOGGER.info("KeyboardInterrupt received: cancelling remaining tasks")
-                # Cancel outstanding futures if any
-                try:
-                    for fut in future_to_file:
+                # Cancel outstanding futures if any (best-effort)
+                # Best-effort cancellation of outstanding futures. We intentionally
+                # suppress all exceptions here because cancellation is best-effort
+                # and must not mask the original KeyboardInterrupt handling.
+                with contextlib.suppress(Exception):
+                    for fut in list(future_to_file):
                         if not fut.done():
                             fut.cancel()
-                except Exception:
-                    pass
-                # Collect any completed futures
-                try:
+                # Collect any completed futures (best-effort)
+                # Collect results from any futures that completed before the
+                # interrupt. Again this is best-effort; we convert any errors
+                # into ProcessingResult instances so callers can inspect them.
+                with contextlib.suppress(Exception):
                     for fut, f in list(future_to_file.items()):
                         if fut.done():
                             try:
                                 res = fut.result()
-                            except Exception as excp2:
-                                from hlpr.cli.models import ProcessingError
-
+                            except Exception as excp2:  # pragma: no cover - defensive
                                 res = ProcessingResult(file=f)
                                 res.error = ProcessingError(
-                                    message=str(excp2), details={"type": type(excp2).__name__}
+                                    message=str(excp2),
+                                    details={"type": type(excp2).__name__},
                                 )
                             results.append(res)
-                except Exception:
-                    pass
                 prog.stop()
                 return results
             # Re-raise other BaseExceptions (e.g., SystemExit)

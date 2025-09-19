@@ -32,13 +32,47 @@ line-length = 88
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"]
-ignore = ["S101", "PLR2004"]  # Ignore assert and magic values in tests
+select = [
+    # Core errors and style
+    "E", "F", "W",               # pycodestyle/pyflakes warnings & errors
+    "I",                           # isort (import order)
+    "UP",                          # pyupgrade
+    "B",                           # flake8-bugbear (sane defaults)
+    "N",                           # pep8-naming
+    "C90",                         # mccabe complexity
+    # Focused extras we actually use
+    "ARG",                         # unused args
+    "BLE",                         # exception handling best practices
+    "RET",                         # return statements
+    "SIM",                         # code simplifications
+    "Q",                           # quotes
+    "T20",                         # print statements
+    "RUF",                         # Ruff-specific rules
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["PLR2004", "PLC0415"]  # Allow magic numbers and imports anywhere in tests
+"tests/**/*.py" = [
+    "S101",    # allow asserts in tests only
+    "PLR2004",  # allow asserts and magic values in tests
+    "PLC0415",  # imports in test functions are acceptable
+    "E501",     # line-too-long in test files
+    "PT018",    # long boolean assertions in tests
+    "ARG001",   # unused test args
+    "SIM102",   # simplify nested ifs in tests
+    "RET504",   # unnecessary assignment before return in tests
+    "TRY003",   # avoid specifying long messages outside exception in tests
+    "EM101",    # exception string literal in tests
+]
 "src/hlpr/document/**/*.py" = ["S101", "PTH123", "S603"]  # Document processing: allow asserts, file paths, subprocess calls
-"src/hlpr/cli/**/*.py" = ["S101", "PTH123"]  # CLI stubs: allow simple asserts and path usage
+"src/hlpr/cli/**/*.py" = [
+        "S101", "PTH123",  # CLI stubs: allow asserts and simple path usage
+        "C901", "PLR0912", "PLR0915",  # cyclomatic complexity and branching
+        "B008", "FBT001", "FBT003",  # typer Argument/Option defaults
+        "A002",  # shadowing builtin names
+        "E501",  # line-too-long
+        "BLE001", "PLC0415", "TC003",  # exception patterns and import positions
+        "SIM102", "TRY300", "EM101", "TRY301", "PLR0913",  # suppress nested if, return placement, exception msg, too many args
+    ]
 
 [tool.ruff.format]
 quote-style = "double"

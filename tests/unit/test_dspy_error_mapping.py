@@ -20,7 +20,7 @@ def test_result_from_future_timeout_raises_summarization_error():
 
     start = time.time()
     with pytest.raises(SummarizationError):
-        summarizer._result_from_future(DummyFuture(), start)  # noqa: SLF001 - testing private helper
+        summarizer._result_from_future(DummyFuture(), start)
 
 
 def test_summarize_long_text_maps_to_summarization_error_if_exception():
@@ -31,7 +31,7 @@ def test_summarize_long_text_maps_to_summarization_error_if_exception():
         msg = "simulated dspy failure"
         raise RuntimeError(msg)
 
-    summarizer._invoke_summarizer = _raise_exc  # noqa: SLF001 - test intentionally patches private method
+    summarizer._invoke_summarizer = _raise_exc
 
     long_text = "x" * 200000
 

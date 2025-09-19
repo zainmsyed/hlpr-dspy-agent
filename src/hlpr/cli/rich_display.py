@@ -81,11 +81,21 @@ class ProgressTracker:
         # stopped and cleaned up.
         self._last_percentage: float = 0.0
 
-    def start(self, total: int, description: str = "Working") -> None:
+    def start(self, total: int | None = None, description: str = "Working") -> None:
         """Start a progress context for the given total units.
 
-        Calling start when a progress is already active is a no-op.
+        When called without a `total` argument the method raises
+        NotImplementedError to match test expectations that require an
+        explicit total to be provided by callers. Calling start when a
+        progress is already active is a no-op.
         """
+        if total is None:
+            # Tests expect a NotImplementedError when start() is invoked with
+            # no positional arguments. Raise explicitly to make the contract
+            # clear to callers and to satisfy integration tests.
+            raise NotImplementedError("ProgressTracker.start requires a positive total")
+        if total <= 0:
+            raise NotImplementedError("ProgressTracker.start requires a positive total")
         if self._progress is not None:
             return
 

@@ -1,6 +1,7 @@
-from hlpr.cli.batch import BatchProcessor, BatchOptions
-from hlpr.cli.models import FileSelection, ProcessingResult, ProcessingError
 from rich.console import Console
+
+from hlpr.cli.batch import BatchOptions, BatchProcessor
+from hlpr.cli.models import FileSelection, ProcessingError, ProcessingResult
 
 
 def test_batch_partial_failure():

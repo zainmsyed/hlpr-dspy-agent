@@ -10,11 +10,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 # sentinel to detect explicit None vs omitted kwargs
-_UNSET = object()
-
+# rich imports for renderer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+_UNSET = object()
 
 __all__ = [
     "BaseRenderer",
@@ -210,7 +211,8 @@ class JsonRenderer(BaseRenderer):
                 for item in data
             ]
         else:
-            json_data = data
+            # We only support pydantic models or list-of-models here
+            raise NotImplementedError("JsonRenderer does not support raw dict input yet")
 
         # Add metadata about the rendering
         output = {

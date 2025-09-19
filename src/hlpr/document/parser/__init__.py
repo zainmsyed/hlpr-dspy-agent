@@ -147,7 +147,7 @@ class DocumentParser:
 
             if not text_content:
                 msg = "No text content found in PDF (may be image-based)"
-                raise DocumentProcessingError(message=msg)  # noqa: TRY301
+                raise DocumentProcessingError(message=msg)
 
             return "\n\n".join(text_content)
 
@@ -211,7 +211,7 @@ class DocumentParser:
 
             if not text_content:
                 msg = "No text content found in PDF (may be image-based)"
-                raise DocumentProcessingError(message=msg)  # noqa: TRY301
+                raise DocumentProcessingError(message=msg)
 
             return "\n\n".join(text_content)
 
@@ -248,7 +248,7 @@ class DocumentParser:
 
             if not text_content:
                 msg = "No text content found in DOCX file"
-                raise ValueError(msg)  # noqa: TRY301
+                raise ValueError(msg)
 
             return "\n\n".join(text_content)
 

@@ -1,6 +1,5 @@
-from pathlib import Path
-from hlpr.cli.summarize import summarize_documents
 from typer.testing import CliRunner
+
 from hlpr.cli.main import app
 
 runner = CliRunner()

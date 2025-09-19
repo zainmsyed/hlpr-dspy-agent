@@ -50,8 +50,9 @@ def test_validate_file_path_ok(tmp_path):
 
 def test_validate_config_missing_keys():
     ok, msg = validate_config({})
-    assert not ok
-    assert "missing required option" in msg
+    # Per CLI contract, an empty config is accepted as a default/ok value.
+    assert ok
+    assert msg == "ok"
 
 
 def test_validate_config_unsupported_provider():

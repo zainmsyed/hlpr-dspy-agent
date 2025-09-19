@@ -59,7 +59,7 @@ class DSPyDocumentSummarizer:
     LLM providers including local, OpenAI, Anthropic, Groq, and Together AI.
     """
 
-    def __init__(  # noqa: PLR0913 - public initializer keeps backward-compatible args
+    def __init__(
         self,
         provider: str = "local",
         model: str = "gemma3:latest",

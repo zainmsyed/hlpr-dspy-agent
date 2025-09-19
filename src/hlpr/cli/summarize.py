@@ -1,5 +1,6 @@
 """Summarize command for hlpr CLI."""
 
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -11,6 +12,22 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
 
+from hlpr.cli.batch import BatchOptions, BatchProcessor
+from hlpr.cli.interactive import InteractiveSession
+from hlpr.cli.models import (
+    FileSelection,
+    OutputFormat,
+    ProcessingError,
+    ProcessingMetadata,
+    ProcessingResult,
+)
+from hlpr.cli.renderers import (
+    JsonRenderer,
+    MarkdownRenderer,
+    PlainTextRenderer,
+    RichRenderer,
+)
+from hlpr.cli.rich_display import RichDisplay
 from hlpr.config import CONFIG
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
@@ -20,13 +37,9 @@ from hlpr.exceptions import (
     HlprError,
     SummarizationError,
 )
+from hlpr.io.atomic import atomic_write_text
 from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
-from hlpr.cli.interactive import InteractiveSession
-from hlpr.cli.rich_display import RichDisplay
-from hlpr.cli.batch import BatchProcessor, BatchOptions
-from hlpr.cli.models import FileSelection, OutputFormat, ProcessingResult, ProcessingMetadata, ProcessingError
-from hlpr.cli.renderers import RichRenderer, JsonRenderer, MarkdownRenderer, PlainTextRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +51,7 @@ console = Console()
 
 
 @app.command("document")
-def summarize_document(  # noqa: PLR0913,C901 - CLI keeps multiple options for UX and is intentionally complex
+def summarize_document(
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
     provider: str = typer.Option(
         "local",
@@ -47,7 +60,7 @@ def summarize_document(  # noqa: PLR0913,C901 - CLI keeps multiple options for U
             "AI provider to use [local|openai|anthropic|groq|together]"
         ),
     ),
-        save: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+        save: bool = typer.Option(
             default=False,
             help="Save summary to file",
         ),
@@ -78,7 +91,7 @@ def summarize_document(  # noqa: PLR0913,C901 - CLI keeps multiple options for U
             "Chunking strategy [sentence|paragraph|fixed|token]"
         ),
     ),
-    verbose: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+    verbose: bool = typer.Option(
         default=False,
         help="Enable verbose output",
     ),
@@ -97,11 +110,11 @@ def summarize_document(  # noqa: PLR0913,C901 - CLI keeps multiple options for U
         "--dspy-timeout",
         help="DSPy request timeout in seconds (falls back to HLPR_DEFAULT_TIMEOUT)",
     ),
-    no_fallback: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+    no_fallback: bool = typer.Option(
         default=False,
         help="Disable fallback to local summarizer on DSPy failure",
     ),
-    verify_hallucinations: bool = typer.Option(  # noqa: FBT001 - boolean CLI flag is conventional
+    verify_hallucinations: bool = typer.Option(
         default=False,
         help="Verify flagged hallucinations with additional model calls",
     ),
@@ -204,7 +217,7 @@ def summarize_document(  # noqa: PLR0913,C901 - CLI keeps multiple options for U
         raise typer.Exit(4) from e
 
 
-def _display_summary(document: Document, result: Any, output_format: str) -> None:  # noqa: C901,PLR0912,PLR0915
+def _display_summary(document: Document, result: Any, output_format: str) -> None:
     """Display the summary results in the specified format."""
     if output_format == "rich":
         # Rich terminal display
@@ -387,7 +400,7 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
     return content
 
 
-def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:  # noqa: FBT001
+def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
     """Parse the document file with a progress indicator and return model+text."""
     with Progress(
         SpinnerColumn(),
@@ -441,14 +454,14 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
     return document, extracted_text
 
 
-def _summarize_with_progress(  # noqa: PLR0913
+def _summarize_with_progress(
     summarizer: DocumentSummarizer,
     document: Document,
     extracted_text: str,
     chunk_size: int,
     chunk_overlap: int,
     chunking_strategy: str,
-    verbose: bool,  # noqa: FBT001
+    verbose: bool,
 ):
     """Generate summary with a progress indicator, using chunking when needed."""
     with Progress(
@@ -551,7 +564,7 @@ def _display_meeting_summary(
 
 
 @app.command("meeting")
-def summarize_meeting(  # noqa: PLR0913
+def summarize_meeting(
     file_path: str = typer.Argument(..., help="Path to meeting notes (txt|md)"),
     output_format: str = typer.Option("rich", "--format", help="[txt|md|json|rich]"),
     title: str | None = typer.Option(None, "--title", help="Optional meeting title"),
@@ -674,8 +687,9 @@ def summarize_documents(
     format: OutputFormat = typer.Option(OutputFormat.RICH, "--format", help="Output format"),
     concurrency: int = typer.Option(4, "--concurrency", help="Max concurrent workers"),
     partial_output: str | None = typer.Option(
-        None, "--partial-output", help="Path to write partial results JSON if run is interrupted"
+        None, "--partial-output", help="Path to write partial results JSON if run is interrupted",
     ),
+    summary_json: str | None = typer.Option(None, "--summary-json", help="Path to write machine-readable batch summary JSON (omit to print to stdout)"),
 ) -> None:
     """Summarize multiple documents concurrently.
 
@@ -694,7 +708,8 @@ def summarize_documents(
         try:
             pth = Path(p)
             size = pth.stat().st_size if pth.exists() and pth.is_file() else None
-        except Exception:
+        except OSError:
+            # Could not stat file (e.g., permission denied) — treat size as unknown
             size = None
         selections.append(FileSelection(path=p, size_bytes=size))
 
@@ -752,7 +767,7 @@ def summarize_documents(
                         meta.provider is not None,
                         meta.key_points is not None,
                         meta.hallucinations is not None,
-                    ]
+                    ],
                 ):
                     pr.metadata = meta
 
@@ -772,7 +787,7 @@ def summarize_documents(
     for r in results:
         out = renderer.render(r)
         # Renderers return formatted string or console text; print to stdout
-        print(out)
+        console.print(out)
 
     # Batch-level error summary for visibility
     error_results = [r for r in results if r.error]
@@ -788,13 +803,13 @@ def summarize_documents(
                 msg = msg[:237] + "..."
             details = ""
             if er.error.details:
-                try:
+                with contextlib.suppress(Exception):
                     details = f" ({er.error.details})"
-                except Exception:
-                    details = ""
 
-            console.print(f"  [red]✗[/red] {er.file.path}: {msg}{details} {f'[code={code}]' if code else ''}")
-            console.print(f"      Hint: run `hlpr summarize document {er.file.path}` to reproduce and inspect the error")
+            console.print(
+                f"  [red]✗[/red] {er.file.path}: {msg}{details} {f'[code={code}]' if code else ''}",
+            )
+            console.print(f"      Hint: run `hlpr summarize document {er.file.path}` to reproduce")
         if len(error_results) > 3:
             console.print(f"  ... and {len(error_results) - 3} more errors")
 
@@ -804,4 +819,47 @@ def summarize_documents(
         jr = JsonRenderer()
         # Convert list of ProcessingResult pydantic models to serializable JSON
         json_text = jr.render(results)
-        Path(partial_output).write_text(json_text, encoding="utf-8")
+        # Write atomically to avoid truncated/corrupt partial files on crash
+        try:
+            atomic_write_text(partial_output, json_text)
+        except OSError:
+            # Fallback to best-effort write if atomic helper fails at OS level
+            Path(partial_output).write_text(json_text, encoding="utf-8")
+
+    # Machine-readable batch summary (per-file status + counts)
+    if summary_json is not None:
+        summary = {
+            "summary": {
+                "total_files": len(results),
+                "succeeded": len([r for r in results if not r.error]),
+                "failed": len([r for r in results if r.error]),
+            },
+            "files": [],
+        }
+        for r in results:
+            entry = {
+                "path": r.file.path,
+                "success": r.error is None,
+                "summary": r.summary,
+                "metadata": r.metadata.model_dump() if r.metadata else None,
+                "error": r.error.model_dump() if r.error else None,
+            }
+            summary["files"].append(entry)
+
+        # Use raw JSON (not JsonRenderer) for a predictable machine-readable
+        # top-level structure that callers expect.
+
+        summary_text = json.dumps(summary, indent=2, ensure_ascii=False)
+
+        # If user passed empty string, print to stdout, else write to path atomically
+        if summary_json == "":
+            # Print to stdout
+            console.print_json(data=summary)
+        else:
+            try:
+                atomic_write_text(summary_json, summary_text)
+                console.print(f"[green]Batch summary written to {summary_json}[/green]")
+            except OSError:
+                # Best-effort fallback when atomic write cannot complete due to OS-level error
+                Path(summary_json).write_text(summary_text, encoding="utf-8")
+

@@ -1,5 +1,5 @@
-from pathlib import Path
 from typer.testing import CliRunner
+
 from hlpr.cli.main import app
 
 runner = CliRunner()
@@ -44,7 +44,7 @@ def test_documents_error_summary(tmp_path):
         assert "Hint: run `hlpr summarize document" in output
     finally:
         # Restore permissions so tmpdir can be cleaned up
-        try:
+        import contextlib
+
+        with contextlib.suppress(Exception):
             bad.chmod(0o644)
-        except Exception:
-            pass

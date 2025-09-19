@@ -3,9 +3,10 @@ import signal
 import threading
 import time
 
-from hlpr.cli.batch import BatchProcessor, BatchOptions
-from hlpr.cli.models import FileSelection
 from rich.console import Console
+
+from hlpr.cli.batch import BatchOptions, BatchProcessor
+from hlpr.cli.models import FileSelection
 
 
 def test_batch_handles_keyboard_interrupt():

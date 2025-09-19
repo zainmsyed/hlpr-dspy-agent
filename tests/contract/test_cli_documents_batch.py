@@ -42,7 +42,7 @@ def test_cli_guided_mode_smoke():
     test_file.write_text("Guided mode test content.")
 
     result = runner.invoke(
-        app, ["summarize", "guided", "--provider", "local", str(test_file)]
+        app, ["summarize", "guided", "--provider", "local", str(test_file)],
     )
 
     # Guided mode either completes successfully or surfaces an error exit code; ensure graceful handling

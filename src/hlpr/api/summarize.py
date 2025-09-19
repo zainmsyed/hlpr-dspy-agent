@@ -298,7 +298,7 @@ def _extract_meeting_items(text: str) -> tuple[list[str], list[str]]:
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-async def summarize_document(  # noqa: C901, PLR0912, PLR0915 - endpoint orchestrates multiple validation paths
+async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple validation paths
     request: Request,
     file: UploadFile | None = None,
     provider_id: str | None = None,
@@ -433,7 +433,7 @@ async def summarize_document(  # noqa: C901, PLR0912, PLR0915 - endpoint orchest
         response = JSONResponse(status_code=status.HTTP_200_OK, content=content)
         if CONFIG.include_correlation_header:
             response.headers["X-Correlation-ID"] = log_ctx.correlation_id
-        return response  # noqa: TRY300 - explicit return consolidated for clarity
+        return response
 
     except HTTPException:
         raise

@@ -25,7 +25,7 @@ def list_providers() -> None:
 
 
 @app.command("add")
-def add_provider(  # noqa: PLR0913
+def add_provider(
     provider_id: str,
     provider_type: str = typer.Option(..., "--type"),
     model: str | None = typer.Option(None, "--model"),
