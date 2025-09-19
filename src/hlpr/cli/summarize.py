@@ -22,6 +22,11 @@ from hlpr.exceptions import (
 )
 from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
+from hlpr.cli.interactive import InteractiveSession
+from hlpr.cli.rich_display import RichDisplay
+from hlpr.cli.batch import BatchProcessor, BatchOptions
+from hlpr.cli.models import FileSelection, OutputFormat, ProcessingResult, ProcessingMetadata, ProcessingError
+from hlpr.cli.renderers import RichRenderer, JsonRenderer, MarkdownRenderer, PlainTextRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -628,3 +633,175 @@ def summarize_meeting(  # noqa: PLR0913
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
         raise typer.Exit(4) from e
+
+
+@app.command("guided")
+def summarize_guided(
+    file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
+    provider: str = typer.Option("local", "--provider", help="AI provider to use"),
+    output_format: str = typer.Option("rich", "--format", help="Output format [txt|md|json|rich]"),
+    steps: int = typer.Option(3, help="Number of simulated steps for the guided flow"),
+    simulate_work: bool = typer.Option(False, help="Simulate work during the guided flow"),
+) -> None:
+    """Run the guided interactive summarization flow.
+
+    This command delegates to `InteractiveSession.run_with_phases` which
+    provides a phase-aware progress UI used by tests and integration.
+    """
+    display = RichDisplay()
+    session = InteractiveSession(display=display)
+    options = {
+        "steps": steps,
+        "simulate_work": simulate_work,
+        "provider": provider,
+        "output_format": output_format,
+    }
+    try:
+        res = session.run_with_phases(file_path, options)
+        if res.get("status") == "error":
+            display.show_error_panel("Guided Mode Error", res.get("message", "Unknown error"))
+            raise typer.Exit(1)
+        display.show_panel("Success", "Guided mode completed successfully")
+    except Exception as e:
+        display.show_error_panel("Unexpected Error", str(e))
+        raise typer.Exit(4) from e
+
+
+@app.command("documents")
+def summarize_documents(
+    files: list[str] = typer.Argument(..., help="Files to summarize"),
+    provider: str = typer.Option("local", "--provider", help="AI provider to use"),
+    format: OutputFormat = typer.Option(OutputFormat.RICH, "--format", help="Output format"),
+    concurrency: int = typer.Option(4, "--concurrency", help="Max concurrent workers"),
+    partial_output: str | None = typer.Option(
+        None, "--partial-output", help="Path to write partial results JSON if run is interrupted"
+    ),
+) -> None:
+    """Summarize multiple documents concurrently.
+
+    This command is the canonical batch entrypoint for installed `hlpr` CLI and
+    will parse each file and call the configured summarizer concurrently.
+    """
+    console = Console()
+
+    # Prepare BatchProcessor
+    options = BatchOptions(max_workers=concurrency, console=console)
+    processor = BatchProcessor(options)
+
+    # Map input paths to FileSelection (include size when available)
+    selections = []
+    for p in files:
+        try:
+            pth = Path(p)
+            size = pth.stat().st_size if pth.exists() and pth.is_file() else None
+        except Exception:
+            size = None
+        selections.append(FileSelection(path=p, size_bytes=size))
+
+    # Renderer selection
+    renderer_map = {
+        OutputFormat.RICH: RichRenderer(console=console),
+        OutputFormat.JSON: JsonRenderer(),
+        OutputFormat.MARKDOWN: MarkdownRenderer(),
+        OutputFormat.TEXT: PlainTextRenderer(),
+    }
+    renderer = renderer_map.get(format, RichRenderer(console=console))
+
+    def make_adapter(provider_name: str | None):
+        try:
+            summarizer = DocumentSummarizer(provider=provider_name or "local")
+        except Exception:
+            summarizer = None
+
+        def adapter(file_sel: FileSelection) -> ProcessingResult:
+            try:
+                text = DocumentParser.parse_file(file_sel.path)
+                doc = Document.from_file(file_sel.path)
+                doc.extracted_text = text
+
+                if summarizer is None:
+                    return ProcessingResult(file=file_sel, summary=f"(stub) summary for {file_sel.path}")
+
+                result = summarizer.summarize_document(doc)
+
+                pr = ProcessingResult(file=file_sel)
+                pr.summary = getattr(result, "summary", None)
+
+                # Build metadata once and populate known fields
+                meta = ProcessingMetadata()
+                proc_ms = getattr(result, "processing_time_ms", None)
+                if proc_ms is not None:
+                    meta.duration_seconds = (proc_ms / 1000.0)
+
+                provider_name = getattr(result, "provider", None)
+                if provider_name:
+                    meta.provider = provider_name
+
+                key_points = getattr(result, "key_points", None)
+                if key_points:
+                    meta.key_points = key_points
+
+                hallucinations = getattr(result, "hallucinations", None)
+                if hallucinations:
+                    meta.hallucinations = hallucinations
+
+                # Only attach metadata if any of the fields were set
+                if any(
+                    [
+                        meta.duration_seconds is not None,
+                        meta.provider is not None,
+                        meta.key_points is not None,
+                        meta.hallucinations is not None,
+                    ]
+                ):
+                    pr.metadata = meta
+
+                return pr
+            except Exception as e:
+                return ProcessingResult(
+                    file=file_sel,
+                    error=ProcessingError(message=str(e), details={"type": type(e).__name__}),
+                )
+
+        return adapter
+
+    summarize_fn = make_adapter(provider)
+
+    results = processor.process_files(selections, summarize_fn)
+
+    for r in results:
+        out = renderer.render(r)
+        # Renderers return formatted string or console text; print to stdout
+        print(out)
+
+    # Batch-level error summary for visibility
+    error_results = [r for r in results if r.error]
+    if error_results:
+        console.print(f"\n[yellow]Warning:[/yellow] {len(error_results)} file(s) failed to process")
+        # Show up to three example failures with brief diagnostics and a hint
+        for er in error_results[:3]:
+            # Prefer structured code when available
+            code = getattr(er.error, "code", None) or er.error.details.get("type") if er.error.details else None
+            msg = (er.error.message or "Unknown error").strip()
+            # Truncate long messages for terminal readability
+            if len(msg) > 240:
+                msg = msg[:237] + "..."
+            details = ""
+            if er.error.details:
+                try:
+                    details = f" ({er.error.details})"
+                except Exception:
+                    details = ""
+
+            console.print(f"  [red]✗[/red] {er.file.path}: {msg}{details} {f'[code={code}]' if code else ''}")
+            console.print(f"      Hint: run `hlpr summarize document {er.file.path}` to reproduce and inspect the error")
+        if len(error_results) > 3:
+            console.print(f"  ... and {len(error_results) - 3} more errors")
+
+    # Persist partial results if the run was interrupted and user requested a path
+    if partial_output and getattr(processor, "interrupted", False):
+        console.print(f"[yellow]Run interrupted; saving partial results to {partial_output}[/yellow]")
+        jr = JsonRenderer()
+        # Convert list of ProcessingResult pydantic models to serializable JSON
+        json_text = jr.render(results)
+        Path(partial_output).write_text(json_text, encoding="utf-8")

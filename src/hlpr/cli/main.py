@@ -58,3 +58,8 @@ def version() -> None:
 
 if __name__ == "__main__":
     app()
+
+
+def main() -> None:
+    """Entry point for console scripts: run the Typer app."""
+    app()

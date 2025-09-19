@@ -53,6 +53,9 @@ class ProcessingMetadata(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     duration_seconds: float | None = None
+    provider: str | None = None
+    key_points: list[str] | None = None
+    hallucinations: list[str] | None = None
 
     @field_validator("duration_seconds")
     @classmethod
