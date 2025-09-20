@@ -5,8 +5,8 @@ multiple LLM providers and automatic prompt optimization.
 """
 
 import contextlib
-import re
 import logging
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -269,71 +269,127 @@ class DSPyDocumentSummarizer:
                 raise SummarizationError(timeout_msg) from None
 
     @staticmethod
+    def _strip_bullet_prefix(s: str) -> str:
+        """Remove common bullet markers from the start of a line."""
+        # Match bullets:
+        #  - • (\u2022)
+        #  - en/em dashes (\u2013/\u2014)
+        #  - '-'
+        #  - '*'
+        #  - numbered like '1.' or '1)'
+        return re.sub(r"^\s*(?:[\u2022\u2013\u2014\-\*]|\d+[\.)])\s+", "", s).strip()
+
+    @staticmethod
+    def _merge_bullet_lines(lines: list[str]) -> list[str]:
+        """Merge continuation lines and return cleaned bullet items."""
+        items: list[str] = []
+        current: str | None = None
+        bullet_re = re.compile(
+            r"^\s*(?P<marker>[\u2022\u2013\u2014\-\*]|\d+[\.)])\s+",
+        )
+        sentence_end_re = re.compile(r"[\.!?]\s*$")
+
+        for raw in lines:
+            if not raw:
+                continue
+            current, finished = DSPyDocumentSummarizer._merge_step(
+                current, raw, bullet_re, sentence_end_re,
+            )
+            if finished:
+                items.append(finished)
+
+        if current:
+            items.append(current.strip())
+
+        # Final cleanup: normalize spaces and strip stray bullet-like chars
+        cleaned: list[str] = []
+        for it in items:
+            it = re.sub(r"\s+", " ", it).strip()
+            # Remove lingering bullet characters from edges
+            it = re.sub(
+                r"^[\u2022\u2013\u2014\-\*\s]+|[\u2022\u2013\u2014]+$",
+                "",
+                it,
+            ).strip()
+            if it:
+                cleaned.append(it)
+        return cleaned
+
+    @staticmethod
+    def _classify_marker(marker: str) -> str:
+        """Classify a bullet marker into a normalized type string."""
+        if re.match(r"^\d+[\.)]$", marker):
+            return "dotnum"
+        if marker == "*":
+            return "star"
+        if marker == "-":
+            return "hyphen"
+        if marker in ("\u2013", "\u2014"):
+            return "dash"
+        return "bullet"  # includes \u2022
+
+    @staticmethod
+    def _merge_step(current: str | None, raw: str, bullet_re, sentence_end_re):
+        """Process one raw line and return (new_current, finished_item|None)."""
+        m = bullet_re.match(raw)
+        ln = DSPyDocumentSummarizer._strip_bullet_prefix(raw)
+        if current is None:
+            return ln, None
+        if not m:
+            return (current + " " + ln).strip(), None
+        marker_type = DSPyDocumentSummarizer._classify_marker(m.group("marker"))
+        if marker_type in ("dotnum", "bullet", "star"):
+            return ln, current.strip()
+        if sentence_end_re.search(current):
+            return ln, current.strip()
+        sep = " - " if marker_type == "hyphen" else " "
+        return (current + sep + ln).strip(), None
+
+    @staticmethod
     def _normalize_key_points(key_points):
         """Normalize key_points into a list of non-empty strings.
 
         Accepts str, list, or other types and returns a cleaned list.
         Handles multi-line bullets by merging continuation lines and strips
-        leading bullet markers ("-", "*", "•", numeric like "1.").
+        leading bullet markers.
         """
-
-        def _strip_bullet_prefix(s: str) -> str:
-            return re.sub(r"^\s*(?:[•\-\*]|\d+[\.)])\s+", "", s).strip()
-
-        def _from_lines(lines: list[str]) -> list[str]:
-            items: list[str] = []
-            current: str | None = None
-            for raw in lines:
-                if not raw:
-                    continue
-                had_marker = bool(re.match(r"^\s*(?:[•\-\*]|\d+[\.)])\s+", raw))
-                ln = _strip_bullet_prefix(raw)
-                if had_marker or current is None:
-                    # Start a new bullet item
-                    if current:
-                        items.append(current.strip())
-                    current = ln
-                else:
-                    # Continuation of previous bullet: merge with space
-                    if current:
-                        # Avoid double spaces
-                        current = (current + " " + ln).strip()
-                    else:
-                        current = ln
-            if current:
-                items.append(current.strip())
-
-            # Final cleanup per item
-            cleaned = []
-            for it in items:
-                it = re.sub(r"\s+", " ", it).strip()
-                # Strip any lingering bullet characters
-                it = it.strip("•-*—– ")
-                if it:
-                    cleaned.append(it)
-            return cleaned
-
         if isinstance(key_points, str):
             lines = [ln.strip() for ln in key_points.splitlines()]
-            return _from_lines(lines)
+            merged = DSPyDocumentSummarizer._merge_bullet_lines(lines)
+            return DSPyDocumentSummarizer._explode_run_on_bullets(merged)
 
         if isinstance(key_points, list):
-            merged: list[str] = []
+            # Flatten list elements into lines and merge as a single stream
+            all_lines: list[str] = []
             for p in key_points:
                 if p is None:
                     continue
                 s = str(p)
-                if "\n" in s:
-                    merged.extend(_from_lines([ln.strip() for ln in s.splitlines()]))
-                else:
-                    cleaned = _strip_bullet_prefix(s)
-                    cleaned = re.sub(r"\s+", " ", cleaned).strip("•-*—– ").strip()
-                    if cleaned:
-                        merged.append(cleaned)
-            return merged
+                all_lines.extend(ln.strip() for ln in s.splitlines())
+            merged = DSPyDocumentSummarizer._merge_bullet_lines(all_lines)
+            return DSPyDocumentSummarizer._explode_run_on_bullets(merged)
 
         # Fallback: coerce to string
         return [str(key_points).strip()]
+
+    @staticmethod
+    def _explode_run_on_bullets(items: list[str]) -> list[str]:
+        """Split very long items with multiple sentences into separate bullets.
+
+        Heuristic: if an item contains 2+ sentence boundaries and is long,
+        split on sentence endings. This helps when models emit one giant
+        paragraph as a single bullet.
+        """
+        out: list[str] = []
+        for it in items:
+            # Count sentences by regex
+            parts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", it.strip())
+            parts = [p.strip() for p in parts if p.strip()]
+            if len(parts) >= 2 and len(it) >= 160:
+                out.extend(parts)
+            else:
+                out.append(it)
+        return out
 
     def _normalize_provider_id(self) -> str | None:
         """Return a normalized provider identifier string or None.
