@@ -23,7 +23,7 @@ always use uv add for adding dependencies to pyproject.toml
 ### Rich and Typer Integration
 The project uses Rich and Typer for beautiful, interactive CLI experiences:
 
-- **Guided Mode**: `hlpr summarize` provides step-by-step interactive workflow
+- **Guided Mode**: `hlpr summarize guided` provides step-by-step interactive workflow
 - **Rich Progress**: Progress bars with phases (parsing → chunking → summarizing)
 - **Rich Panels**: Color-coded output for summaries, key points, and metadata
 - **Interactive Prompts**: File selection, provider choice, configuration options
@@ -32,7 +32,7 @@ The project uses Rich and Typer for beautiful, interactive CLI experiences:
 ### CLI Architecture
 ```
 src/hlpr/cli/
-├── interactive.py      # Guided mode prompts and workflows
+├── interactive.py      # Enhanced guided mode prompts and workflows
 ├── rich_display.py     # Rich formatting, panels, progress bars
 ├── validators.py       # Input validation with rich error messages
 ├── batch.py           # Multi-file processing logic
@@ -40,11 +40,45 @@ src/hlpr/cli/
 ```
 
 ### Key Components
-- `InteractiveSession`: Manages guided mode state and workflow
+- `InteractiveSession`: Manages guided mode state and workflow (enhanced for real processing)
 - `RichDisplay`: Handles Rich-based formatting and progress
 - `ProgressTracker`: Phase-aware progress with Rich.Progress
 - `BatchProcessor`: Parallel processing of multiple files
 - Output formats: rich (default), txt, md, json
+
+## Guided Workflow Enhancement (Feature 004)
+
+### Enhanced Interactive Experience
+The guided workflow transforms from simulation-only to fully functional:
+
+- **Two-Tier Options**: Basic (provider, format, save) → Advanced (temperature, chunking)
+- **Real Processing**: Uses existing CLI pipeline (_parse_with_progress, _summarize_with_progress)
+- **Command Templates**: Generates reusable CLI commands with placeholders
+- **Error Recovery**: Input validation with re-prompting and graceful Ctrl+C handling
+
+### Data Models
+```python
+# ProcessingOptions: Type-safe configuration
+class ProcessingOptions(BaseModel):
+    provider: Literal["local", "openai", "anthropic", "groq", "together"] = "local"
+    format: Literal["rich", "txt", "md", "json"] = "rich"
+    temperature: float = Field(0.3, ge=0.0, le=1.0)
+    chunk_size: int = Field(8192, gt=0, le=32768)
+    # ... additional options
+
+# CommandTemplate: Reusable command storage
+class CommandTemplate(BaseModel):
+    id: str
+    command_template: str  # "hlpr summarize document [PASTE FILE PATH HERE] ..."
+    options: Dict[str, Any]
+    created: datetime
+```
+
+### Implementation Patterns
+- **Option Collection**: Rich prompts with defaults and validation
+- **Progress Integration**: Reuse existing phase-aware progress tracking
+- **Template Generation**: Convert options to CLI arguments with placeholders
+- **Persistence**: JSON storage in ~/.hlpr/saved_commands.json
 
 ## Commands
 ```bash
