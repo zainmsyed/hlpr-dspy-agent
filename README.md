@@ -1,67 +1,124 @@
-(# hlpr — Document Summarization)
+# hlpr — Document Summarization
 
-This repository contains hlpr, a small document processing and summarization toolkit.
+Personal AI assistant for document summarization with a beautiful CLI/TUI experience.
 
-CLI: hlpr summarize document
+## Quick Start
 
-Options (high level):
-- --provider: AI provider to use (local|openai|anthropic|groq|together)
-- --model: Model name (e.g., gemma3:latest)
-- --temperature: Sampling temperature for the model (0.0-1.0). Default is 0.3.
-- --dspy-timeout: DSPy request timeout in seconds
-- --verify-hallucinations: Enable optional model-backed verification for flagged sentences
+Follow these minimal steps to get the project running locally.
 
-Examples:
+1) Install uv (recommended)
 
-Summarize a markdown file with default settings:
-
-	hlpr summarize document documents/examples/welcome_to_wrtr.md
-
-Summarize with a deterministic output (temperature 0.0):
-
-	hlpr summarize document documents/examples/welcome_to_wrtr.md --temperature 0.0
-
-API: POST /summarize/document
-
-You can supply an optional `temperature` field in the JSON body or as a query parameter. When omitted, the server defaults to 0.3.
+   Follow the official guide: https://docs.astral.sh/uv/getting-started/installation/
 
 
-Logging and correlation IDs
----------------------------
+2) Clone and install
 
-hlpr emits structured logs enriched with a correlation ID so you can trace a request end-to-end across the API, CLI, and DSPy layers. Behavior is controlled via environment variables:
+```bash
+git clone https://github.com/zainmsyed/hlpr-dspy-agent.git
+cd hlpr
+# create virtual environment and install baseline dependencies with uv
+uv sync
+```
 
-- HLPR_INCLUDE_FILE_PATHS (default: false)
-	- When true, logs may include user-provided file names. Filenames are sanitized to basenames (no full paths).
-- HLPR_INCLUDE_TEXT_LENGTH (default: true)
-	- When true, logs for text requests include the length of the input text.
-- HLPR_INCLUDE_CORRELATION_HEADER (default: true)
-	- When true, API responses include the header `X-Correlation-ID` so callers can correlate client logs with server logs.
-- HLPR_PERFORMANCE_LOGGING (default: true)
-	- When true, logs include simple timing metrics like `processing_time_ms` for completed operations.
+For most users (minimal runtime install)
 
-Example API response headers (when enabled):
+```bash
+# editable install (useful for local tweaks without dev extras)
+pip install -e .
 
-		X-Correlation-ID: 3fb1c4f4-2c7b-4c69-8519-1b8d2fd0f5ac
+# production install
+pip install .
 
-Notes:
-- Filename logging always uses the basename via sanitization to avoid leaking local filesystem paths.
-- Long error messages are truncated in logs to keep entries small and readable.
+# per-user isolated CLI install (recommended)
+pipx install .
+```
 
 
-CORS configuration
-------------------
+Optional: contributor / developer setup (dev tooling)
 
-By default hlpr restricts CORS to local origins to avoid accidentally
-enabling wide-open CORS in production. You can override allowed origins
-using the `HLPR_ALLOWED_ORIGINS` environment variable. Examples:
+```bash
+# preferred: sets up the development environment with uv
+uv sync --group dev
 
-- Allow localhost (default): leave `HLPR_ALLOWED_ORIGINS` unset
-- Allow a specific origin: `HLPR_ALLOWED_ORIGINS=https://example.com`
-- Allow multiple origins: `HLPR_ALLOWED_ORIGINS=https://a.com,https://b.com`
-- Allow all origins (development only): `HLPR_ALLOWED_ORIGINS=*`
+# or with pip (editable install + dev extras)
+pip install -e .[dev]
+```
 
-Set the environment variable before starting the server. For example:
+3) Try it out
 
-	export HLPR_ALLOWED_ORIGINS="https://example.com"
+```bash
+# Summarize a single document (rich terminal output)
+hlpr summarize document test_document.txt
+
+# Get JSON output
+hlpr summarize document test_document.txt --format json
+
+# Process multiple files and write markdown summaries
+hlpr summarize documents *.txt --format md
+
+```
+## Temperature example
+
+`--temperature` controls sampling randomness for model output. Lower values (0.0) make output deterministic; higher values (e.g., 0.7) increase creativity/diversity.
+
+```bash
+# Deterministic output (less creative, repeatable)
+hlpr summarize document documents/examples/welcome_to_wrtr.md --temperature 0.0 
+
+# More diverse output (more creative / varied)
+hlpr summarize document documents/examples/welcome_to_wrtr.md --temperature 0.7 
+
+```
+
+
+4) See all options
+
+```bash
+hlpr --help
+hlpr summarize --help
+```
+
+For detailed documentation and API reference, see `documents/detailed-readme.md`.
+
+
+## Common Commands
+
+```bash
+# Summarize a document (JSON output)
+hlpr summarize document documents/examples/welcome_to_wrtr.md --provider local --format json
+
+# Guided mode with phase-aware progress
+hlpr summarize guided documents/examples/welcome_to_wrtr.md --provider local --format rich
+
+# Save output to a file (auto filename or explicit path)
+hlpr summarize document test_document.txt --save --format md
+hlpr summarize document test_document.txt --save --output my_summary.json --format json
+```
+
+## Notes for local development
+
+- For `provider=local`, the summarizer defaults to no timeout when not explicitly provided; pass `--dspy-timeout` if you want to enforce one. See `documents/local-dspy.md` for more details.
+- When piping to another process (e.g., `| jq ...`), prefer `--format json` to avoid ANSI sequences.
+
+## Troubleshooting
+
+- File not found: check the path or use an absolute path.
+- Unsupported file format: use PDF, DOCX, TXT, or MD.
+- Provider unavailable: try `--provider local` or configure credentials for the chosen provider.
+
+---
+
+## API: POST /summarize/document
+
+The API supports a `temperature` parameter in the JSON body or as a query parameter. When omitted, the server defaults to `0.3`.
+
+## Logging and correlation IDs
+
+hlpr emits structured logs enriched with a correlation ID so you can trace a request end-to-end across the API, CLI, and DSPy layers. Behavior is controlled via environment variables described in the project documentation.
+
+## CORS configuration
+
+By default hlpr restricts CORS to local origins. Override allowed origins with the `HLPR_ALLOWED_ORIGINS` environment variable.
+
+For the full API reference and configuration examples, see `documents/detailed-readme.md`.
 
