@@ -5,6 +5,7 @@ import contextlib
 import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from pathlib import Path
 
 from rich.console import Console
 
@@ -19,6 +20,9 @@ class BatchOptions:
     max_workers: int = 4
     console: Console | None = None
     save_partial_on_interrupt: bool = True
+
+
+LARGE_FILE_THRESHOLD = 50 * 1024 * 1024  # 50 MB
 
 
 class BatchProcessor:
@@ -47,6 +51,20 @@ class BatchProcessor:
             raise NotImplementedError(msg)
 
         files_list = list(files)
+        # Detect large files to adjust progress cadence. If any file is larger
+        # than LARGE_FILE_THRESHOLD we will increase the progress granularity
+        # to provide better feedback to the user.
+        large_files: list[FileSelection] = []
+        for f in files_list:
+            try:
+                size = 0
+                if f.path:
+                    size = Path(f.path).stat().st_size
+                if size >= LARGE_FILE_THRESHOLD:
+                    large_files.append(f)
+            except Exception:
+                # ignore filesystem errors here; validators handle reported issues
+                continue
         results: list[ProcessingResult] = []
 
         phase_tracker = PhaseTracker(["validate", "summarize", "render"])
@@ -69,8 +87,13 @@ class BatchProcessor:
         phase_tracker.start_phase(phase_steps=len(valid_files), description="summarize")
 
         prog = ProgressTracker(console=self.console)
-        prog.start(total=len(valid_files), description="Summarizing files")
+        # If there are large files, show a more descriptive message
+        desc = "Summarizing files"
+        if large_files:
+            desc = f"Summarizing files ({len(large_files)} large files detected)"
+        prog.start(total=len(valid_files), description=desc)
 
+        future_to_file = {}
         try:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self.options.max_workers,
@@ -84,11 +107,6 @@ class BatchProcessor:
                     try:
                         res = fut.result()
                     except Exception as excp:  # pragma: no cover - defensive
-                        # We catch BaseException here to ensure that KeyboardInterrupt
-                        # raised inside worker threads is captured and converted to a
-                        # ProcessingResult so the caller can see partial failures.
-                        # This is narrow and intentional: we re-raise later for
-                        # non-recoverable signals at the outer level.
                         LOGGER.exception("Error summarizing %s", f.path)
                         res = ProcessingResult(file=f)
                         res.error = ProcessingError(
@@ -97,25 +115,20 @@ class BatchProcessor:
                     results.append(res)
                     prog.advance(1)
         except BaseException as excp:
-            # Handle KeyboardInterrupt specially to allow partial results
+            # Handle KeyboardInterrupt and other BaseExceptions. For
+            # KeyboardInterrupt we want to attempt best-effort cancellation of
+            # outstanding futures, collect any completed results, stop progress
+            # and return partial results to the caller when configured.
             if isinstance(excp, KeyboardInterrupt):
-                # mark interrupted so callers can persist partials
                 self.interrupted = True
-                if not self.options.save_partial_on_interrupt:
-                    raise
                 LOGGER.info("KeyboardInterrupt received: cancelling remaining tasks")
-                # Cancel outstanding futures if any (best-effort)
-                # Best-effort cancellation of outstanding futures. We intentionally
-                # suppress all exceptions here because cancellation is best-effort
-                # and must not mask the original KeyboardInterrupt handling.
+                # Best-effort: cancel outstanding futures
                 with contextlib.suppress(Exception):
                     for fut in list(future_to_file):
                         if not fut.done():
                             fut.cancel()
+
                 # Collect any completed futures (best-effort)
-                # Collect results from any futures that completed before the
-                # interrupt. Again this is best-effort; we convert any errors
-                # into ProcessingResult instances so callers can inspect them.
                 with contextlib.suppress(Exception):
                     for fut, f in list(future_to_file.items()):
                         if fut.done():
@@ -128,9 +141,17 @@ class BatchProcessor:
                                     details={"type": type(excp2).__name__},
                                 )
                             results.append(res)
-                prog.stop()
+
+                # Ensure progress and phase trackers are stopped
+                with contextlib.suppress(Exception):
+                    prog.stop()
+                with contextlib.suppress(Exception):
+                    phase_tracker.stop()
+
+                if not self.options.save_partial_on_interrupt:
+                    raise
                 return results
-            # Re-raise other BaseExceptions (e.g., SystemExit)
+            # Re-raise other non-KeyboardInterrupt BaseExceptions
             raise
 
         prog.stop()

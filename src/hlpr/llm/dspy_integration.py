@@ -288,6 +288,16 @@ class DSPyDocumentSummarizer:
             r"^\s*(?P<marker>[\u2022\u2013\u2014\-\*]|\d+[\.)])\s+",
         )
         sentence_end_re = re.compile(r"[\.!?]\s*$")
+        # If there are no explicit bullet markers in the input, treat each
+        # non-empty line as its own item. This avoids concatenating plain
+        # newline-separated key points into a single merged string.
+        if not any(bullet_re.match(raw) for raw in lines if raw):
+            cleaned_simple = [
+                re.sub(r"\s+", " ", ln).strip()
+                for ln in lines
+                if ln and ln.strip()
+            ]
+            return [ln for ln in cleaned_simple if ln]
 
         for raw in lines:
             if not raw:

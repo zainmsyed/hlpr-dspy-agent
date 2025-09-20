@@ -7,7 +7,12 @@ import os
 from collections.abc import Iterable
 from pathlib import Path
 
-__all__ = ["validate_config", "validate_file_path"]
+__all__ = [
+    "resolve_config_conflicts",
+    "suggest_file_fixes",
+    "validate_config",
+    "validate_file_path",
+]
 
 
 def validate_file_path(path: str) -> tuple[bool, str]:
@@ -32,6 +37,29 @@ def validate_file_path(path: str) -> tuple[bool, str]:
         return False, "file accessibility could not be determined"
 
     return True, "ok"
+
+
+def suggest_file_fixes(path: str) -> list[str]:
+    """Return a small list of suggestions for common file path problems.
+
+    This is intentionally lightweight: callers should present suggestions to
+    users when validation fails (e.g., typo corrections, missing extension).
+    """
+    suggestions: list[str] = []
+    if not isinstance(path, str) or not path:
+        suggestions.append("Provide a non-empty file path")
+        return suggestions
+
+    p = Path(path)
+    # Suggest adding common extensions if missing
+    if not p.suffix:
+        suggestions.append(f"Did you mean '{path}.md' or '{path}.txt'?")
+
+    # Suggest checking working directory when path looks relative
+    if not p.is_absolute():
+        suggestions.append("Try using an absolute path or verify current working directory")
+
+    return suggestions
 
 
 def validate_config(
@@ -73,3 +101,33 @@ def validate_config(
         return False, f"unsupported output_format: {ofmt}"
 
     return True, "ok"
+
+
+def resolve_config_conflicts(options: dict[str, object]) -> tuple[dict[str, object], list[str]]:
+    """Detect and resolve simple configuration conflicts.
+
+    Returns a tuple of (resolved_options, warnings). This resolver handles a
+    small set of predictable conflicts: e.g., incompatible provider+format
+    combinations, or mutually exclusive flags. The function makes conservative
+    choices and records warnings instead of silently changing user intent.
+    """
+    resolved = dict(options or {})
+    warnings: list[str] = []
+
+    provider = resolved.get("provider")
+    fmt = resolved.get("output_format")
+    if provider == "local" and fmt == "rich":
+        # local provider might not support rich rendering in headless contexts
+        warnings.append("'local' provider may not support 'rich' output in headless environments; falling back to 'txt'")
+        resolved["output_format"] = "txt"
+
+    # Normalize boolean flags that may be provided as strings
+    for key in ("simulate_work", "dry_run"):
+        if key in resolved and isinstance(resolved[key], str):
+            val = resolved[key].lower()
+            if val in ("1", "true", "yes", "y"):  # type: ignore[attr-defined]
+                resolved[key] = True
+            elif val in ("0", "false", "no", "n"):
+                resolved[key] = False
+
+    return resolved, warnings
