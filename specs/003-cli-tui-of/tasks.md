@@ -307,6 +307,31 @@ Notes on hardening:
 - [ ] T041 Configuration conflict resolution in `src/hlpr/cli/validators.py`
 - [ ] T042 Large file handling with progress feedback in `src/hlpr/cli/batch.py`
 
+### Progress - Phase 3.7 Completed ✅
+Implemented the Phase 3.7 error handling and edge-case features with tests and linting.
+
+Summary of changes and behavior:
+- Interruption handling (T038): `InteractiveSession.run` and `run_with_phases` now catch `KeyboardInterrupt`, stop progress, show an Interrupt panel, and return a structured `interrupted` SessionResult. `BatchProcessor.process_files` consolidates interrupt handling, cancels outstanding futures, collects completed results, stops progress/phase trackers, and returns partial results when `save_partial_on_interrupt` is enabled.
+- File validation suggestions (T039): `src/hlpr/cli/validators.py` includes `suggest_file_fixes(path)` which returns actionable hints (missing extension, relative path advice) when validation fails.
+- Provider fallback (T040) & Config conflict resolution (T041): `resolve_config_conflicts(options)` performs conservative fallbacks (example: `local + rich -> txt`) and normalizes boolean flags; warnings are returned to callers.
+- Large file handling (T042): `src/hlpr/cli/batch.py` now detects large files (50MB threshold) and provides an enhanced progress description when large files are present.
+
+Files modified for Phase 3.7:
+- `src/hlpr/cli/interactive.py` — improved interrupt handling across phases, defensive validator wrappers, `PHASES` and `DEFAULT_STEPS` constants
+- `src/hlpr/cli/validators.py` — `suggest_file_fixes()` and `resolve_config_conflicts()` helpers
+- `src/hlpr/cli/batch.py` — consolidated KeyboardInterrupt handling, `LARGE_FILE_THRESHOLD` constant, partial-result collection
+- `src/hlpr/llm/dspy_integration.py` — improved `_merge_bullet_lines` heuristic to treat plain newline lists as separate bullets
+- `tests/unit/test_cli_37_interrupt_and_suggestions.py` — unit tests for suggestions and interrupt behavior
+
+Test & lint status:
+- Unit tests: all pass
+- Lint (ruff): pass via project runner (`uvx run ruff check src tests`)
+
+Notes / Follow-ups:
+- Consider expanding `suggest_file_fixes()` suggestions, and making conflict-resolution rules configurable.
+- Add integration tests that simulate real CLI interruptions and assert partial-output persistence.
+- Add telemetry/logging for interrupts and partial-save events.
+
 ## Phase 3.8: Validation & Polish
 - [ ] T043 [P] Execute all quickstart scenarios from `specs/003-cli-tui-of/quickstart.md`
 
