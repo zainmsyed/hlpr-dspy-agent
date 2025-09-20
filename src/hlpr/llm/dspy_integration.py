@@ -5,6 +5,7 @@ multiple LLM providers and automatic prompt optimization.
 """
 
 import contextlib
+import re
 import logging
 import threading
 import time
@@ -272,12 +273,67 @@ class DSPyDocumentSummarizer:
         """Normalize key_points into a list of non-empty strings.
 
         Accepts str, list, or other types and returns a cleaned list.
+        Handles multi-line bullets by merging continuation lines and strips
+        leading bullet markers ("-", "*", "•", numeric like "1.").
         """
+
+        def _strip_bullet_prefix(s: str) -> str:
+            return re.sub(r"^\s*(?:[•\-\*]|\d+[\.)])\s+", "", s).strip()
+
+        def _from_lines(lines: list[str]) -> list[str]:
+            items: list[str] = []
+            current: str | None = None
+            for raw in lines:
+                if not raw:
+                    continue
+                had_marker = bool(re.match(r"^\s*(?:[•\-\*]|\d+[\.)])\s+", raw))
+                ln = _strip_bullet_prefix(raw)
+                if had_marker or current is None:
+                    # Start a new bullet item
+                    if current:
+                        items.append(current.strip())
+                    current = ln
+                else:
+                    # Continuation of previous bullet: merge with space
+                    if current:
+                        # Avoid double spaces
+                        current = (current + " " + ln).strip()
+                    else:
+                        current = ln
+            if current:
+                items.append(current.strip())
+
+            # Final cleanup per item
+            cleaned = []
+            for it in items:
+                it = re.sub(r"\s+", " ", it).strip()
+                # Strip any lingering bullet characters
+                it = it.strip("•-*—– ")
+                if it:
+                    cleaned.append(it)
+            return cleaned
+
         if isinstance(key_points, str):
-            return [point.strip() for point in key_points.split("\n") if point.strip()]
+            lines = [ln.strip() for ln in key_points.splitlines()]
+            return _from_lines(lines)
+
         if isinstance(key_points, list):
-            return [str(p).strip() for p in key_points if str(p).strip()]
-        return [str(key_points)]
+            merged: list[str] = []
+            for p in key_points:
+                if p is None:
+                    continue
+                s = str(p)
+                if "\n" in s:
+                    merged.extend(_from_lines([ln.strip() for ln in s.splitlines()]))
+                else:
+                    cleaned = _strip_bullet_prefix(s)
+                    cleaned = re.sub(r"\s+", " ", cleaned).strip("•-*—– ").strip()
+                    if cleaned:
+                        merged.append(cleaned)
+            return merged
+
+        # Fallback: coerce to string
+        return [str(key_points).strip()]
 
     def _normalize_provider_id(self) -> str | None:
         """Return a normalized provider identifier string or None.
