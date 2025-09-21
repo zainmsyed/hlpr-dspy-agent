@@ -93,11 +93,10 @@ class InteractivePromptProvider:
 
     def advanced_options_prompt(self) -> dict[str, Any]:
         chunk = self._input_with_default("Chunk size", str(self.defaults.get("chunk_size", 8192)))
-        steps = self._input_with_default("Steps", str(self.defaults.get("steps", 3)))
         try:
-            return {"chunk_size": int(chunk), "steps": int(steps)}
+            return {"chunk_size": int(chunk)}
         except Exception:
-            return {"chunk_size": int(self.defaults.get("chunk_size", 8192)), "steps": int(self.defaults.get("steps", 3))}
+            return {"chunk_size": int(self.defaults.get("chunk_size", 8192))}
 
 
 class RichTyperPromptProvider:
@@ -128,8 +127,7 @@ class RichTyperPromptProvider:
 
     def advanced_options_prompt(self) -> dict[str, Any]:
         chunk = typer.prompt("Chunk size", default=str(self.defaults.get("chunk_size", 8192)))
-        steps = typer.prompt("Steps", default=str(self.defaults.get("steps", 3)))
         try:
-            return {"chunk_size": int(chunk), "steps": int(steps)}
+            return {"chunk_size": int(chunk)}
         except Exception:
-            return {"chunk_size": int(self.defaults.get("chunk_size", 8192)), "steps": int(self.defaults.get("steps", 3))}
+            return {"chunk_size": int(self.defaults.get("chunk_size", 8192))}

@@ -36,5 +36,4 @@ class OptionPrompts:
     def advanced_options_prompt(self) -> dict[str, Any]:
         return {
             "chunk_size": int(self.defaults.get("chunk_size", 8192)),
-            "steps": int(self.defaults.get("steps", 3)),
         }

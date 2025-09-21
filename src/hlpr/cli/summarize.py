@@ -656,7 +656,6 @@ def summarize_guided(
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
     provider: str = typer.Option("local", "--provider", help="AI provider to use"),
     output_format: str = typer.Option("rich", "--format", help="Output format [txt|md|json|rich]"),
-    steps: int = typer.Option(3, help="Number of simulated steps for the guided flow"),
     simulate_work: bool = typer.Option(False, help="Simulate work during the guided flow"),
     execute: bool = typer.Option(True, "--execute/--no-execute", help="Run parse+summarization after prompts (default: interactive execute)"),
 ) -> None:
@@ -741,7 +740,6 @@ def summarize_guided(
         # lower-level run_with_phases to preserve test behavior and allow
         # non-interactive demonstrations.
         options = {
-            "steps": steps,
             "simulate_work": simulate_work,
             "provider": provider,
             "output_format": output_format,

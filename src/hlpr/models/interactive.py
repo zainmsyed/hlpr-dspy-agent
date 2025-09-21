@@ -44,7 +44,9 @@ class ProcessingOptions(BaseModel):
             args += ["--save", "true"]
             if self.output_path:
                 args += ["--output", self.output_path]
-        args += ["--steps", str(self.steps)]
+        # NOTE: steps is an internal UI-only setting (progress/demo). Do not
+        # emit it into generated CLI invocations to avoid exposing it to
+        # downstream commands or saved templates.
         return args
 
     @field_validator("output_path")
