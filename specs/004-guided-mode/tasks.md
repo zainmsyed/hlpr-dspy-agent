@@ -40,9 +40,9 @@ Single project structure (existing hlpr codebase):
 - **Tests**: `tests/contract/`, `tests/integration/`, `tests/unit/`
 
 ## Phase 3.1: Setup
-- [ ] T001 Verify existing Python environment and UV dependency management
-- [ ] T002 [P] Run ruff check to ensure codebase baseline compliance
-- [ ] T003 Create test documents in /tmp/hlpr-test-docs for validation
+- [x] T001 Verify existing Python environment and UV dependency management
+- [x] T002 [P] Run ruff check to ensure codebase baseline compliance
+- [x] T003 Create test documents in /tmp/hlpr-test-docs for validation
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
@@ -52,6 +52,12 @@ Single project structure (existing hlpr codebase):
 - [ ] T007 [P] Contract test command template generation in tests/contract/test_cli_guided_enhanced.py
 - [ ] T008 [P] Contract test keyboard interrupt handling in tests/contract/test_cli_guided_enhanced.py
 - [ ] T009 [P] Integration test complete guided workflow in tests/integration/test_guided_workflow_complete.py
+- [x] T004 [P] Contract test guided workflow with defaults in tests/contract/test_cli_guided_enhanced.py
+- [x] T005 [P] Contract test advanced options collection in tests/contract/test_cli_guided_enhanced.py
+- [x] T006 [P] Contract test option validation and error handling in tests/contract/test_cli_interactive_options.py
+- [x] T007 [P] Contract test command template generation in tests/contract/test_cli_guided_enhanced.py
+- [x] T008 [P] Contract test keyboard interrupt handling in tests/contract/test_cli_guided_enhanced.py
+- [x] T009 [P] Integration test complete guided workflow in tests/integration/test_guided_workflow_complete.py
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
 
