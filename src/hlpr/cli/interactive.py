@@ -7,6 +7,7 @@ lightweight helper that can be replaced by a more interactive picker later.
 import contextlib
 import logging
 import time
+from datetime import UTC
 from typing import Any, TypedDict
 
 from hlpr.cli.prompt_providers import DefaultPromptProvider, PromptProvider
@@ -179,11 +180,15 @@ class InteractiveSession:
         """
         args = options.to_cli_args() if hasattr(options, "to_cli_args") else []
         cmd = "hlpr summarize document " + " ".join(args)
-        # use a simple id based on timestamp
+        # use a simple id based on timestamp (timezone-aware)
         from datetime import datetime
 
-        id = datetime.utcnow().isoformat() + "Z"
-        return CommandTemplate.from_options(id=id, command_template=cmd, options=options.model_dump() if hasattr(options, "model_dump") else dict(options))
+        id = datetime.now(UTC).isoformat()
+        return CommandTemplate.from_options(
+            id=id,
+            command_template=cmd,
+            options=options.model_dump() if hasattr(options, "model_dump") else dict(options),
+        )
 
     def display_command_template(self, template: CommandTemplate) -> None:
         """Display a generated command template using the RichDisplay panel."""

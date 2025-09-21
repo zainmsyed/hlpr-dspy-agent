@@ -3,6 +3,12 @@
 **Input**: Design documents from `/specs/004-guided-mode/`
 **Prerequisites**: plan.md (required), research.md, data-model.md, contracts/
 
+````markdown
+# Tasks: Robust Guided Workflow for Document Summarization
+
+**Input**: Design documents from `/specs/004-guided-mode/`
+**Prerequisites**: plan.md (required), research.md, data-model.md, contracts/
+
 ## Execution Flow (main)
 ```
 1. Load plan.md from feature directory
@@ -46,12 +52,6 @@ Single project structure (existing hlpr codebase):
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
-- [ ] T004 [P] Contract test guided workflow with defaults in tests/contract/test_cli_guided_enhanced.py
-- [ ] T005 [P] Contract test advanced options collection in tests/contract/test_cli_guided_enhanced.py
-- [ ] T006 [P] Contract test option validation and error handling in tests/contract/test_cli_interactive_options.py
-- [ ] T007 [P] Contract test command template generation in tests/contract/test_cli_guided_enhanced.py
-- [ ] T008 [P] Contract test keyboard interrupt handling in tests/contract/test_cli_guided_enhanced.py
-- [ ] T009 [P] Integration test complete guided workflow in tests/integration/test_guided_workflow_complete.py
 - [x] T004 [P] Contract test guided workflow with defaults in tests/contract/test_cli_guided_enhanced.py
 - [x] T005 [P] Contract test advanced options collection in tests/contract/test_cli_guided_enhanced.py
 - [x] T006 [P] Contract test option validation and error handling in tests/contract/test_cli_interactive_options.py
@@ -62,42 +62,42 @@ Single project structure (existing hlpr codebase):
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
 
 ### Data Models (Parallel Implementation)
-- [ ] T010 [P] ProcessingOptions Pydantic model in src/hlpr/models/interactive.py
-- [ ] T011 [P] CommandTemplate Pydantic model in src/hlpr/models/templates.py  
-- [ ] T012 [P] SavedCommands manager class in src/hlpr/models/saved_commands.py
-- [ ] T013 [P] OptionPrompts Rich interface in src/hlpr/cli/prompts.py
+- [x] T010 [P] ProcessingOptions Pydantic model in src/hlpr/models/interactive.py
+- [x] T011 [P] CommandTemplate Pydantic model in src/hlpr/models/templates.py
+- [x] T012 [P] SavedCommands manager class in src/hlpr/models/saved_commands.py
+- [x] T013 [P] OptionPrompts Rich interface in src/hlpr/cli/prompts.py
 
 ### Enhanced Interactive Session (Sequential - Same File)
-- [ ] T014 Enhance InteractiveSession.collect_basic_options() in src/hlpr/cli/interactive.py
-- [ ] T015 Add InteractiveSession.collect_advanced_options() in src/hlpr/cli/interactive.py
-- [ ] T016 Add InteractiveSession.process_document_with_options() in src/hlpr/cli/interactive.py
-- [ ] T017 Add InteractiveSession.generate_command_template() in src/hlpr/cli/interactive.py
-- [ ] T018 Add InteractiveSession.display_command_template() in src/hlpr/cli/interactive.py
-- [ ] T019 Add InteractiveSession.handle_keyboard_interrupt() in src/hlpr/cli/interactive.py
+- [x] T014 Enhance InteractiveSession.collect_basic_options() in src/hlpr/cli/interactive.py
+- [x] T015 Add InteractiveSession.collect_advanced_options() in src/hlpr/cli/interactive.py
+- [x] T016 Add InteractiveSession.process_document_with_options() in src/hlpr/cli/interactive.py
+- [x] T017 Add InteractiveSession.generate_command_template() in src/hlpr/cli/interactive.py
+- [x] T018 Add InteractiveSession.display_command_template() in src/hlpr/cli/interactive.py
+- [x] T019 Add InteractiveSession.handle_keyboard_interrupt() in src/hlpr/cli/interactive.py
 
 ### Option Collection Implementation
-- [ ] T020 Implement OptionPrompts.provider_prompt() in src/hlpr/cli/prompts.py
-- [ ] T021 Implement OptionPrompts.format_prompt() in src/hlpr/cli/prompts.py
-- [ ] T022 Implement OptionPrompts.save_file_prompt() in src/hlpr/cli/prompts.py
-- [ ] T023 Implement OptionPrompts.temperature_prompt() in src/hlpr/cli/prompts.py
-- [ ] T024 Implement OptionPrompts.advanced_options_prompt() in src/hlpr/cli/prompts.py
+- [x] T020 Implement OptionPrompts.provider_prompt() in src/hlpr/cli/prompts.py
+- [x] T021 Implement OptionPrompts.format_prompt() in src/hlpr/cli/prompts.py
+- [x] T022 Implement OptionPrompts.save_file_prompt() in src/hlpr/cli/prompts.py
+- [x] T023 Implement OptionPrompts.temperature_prompt() in src/hlpr/cli/prompts.py
+- [x] T024 Implement OptionPrompts.advanced_options_prompt() in src/hlpr/cli/prompts.py
 
 ### Command Template System
-- [ ] T025 Implement CommandTemplate.from_options() class method in src/hlpr/models/templates.py
-- [ ] T026 Implement SavedCommands.save_command() in src/hlpr/models/saved_commands.py
-- [ ] T027 Implement SavedCommands.load_commands() in src/hlpr/models/saved_commands.py
+- [x] T025 Implement CommandTemplate.from_options() class method in src/hlpr/models/templates.py
+- [x] T026 Implement SavedCommands.save_command() in src/hlpr/models/saved_commands.py
+- [x] T027 Implement SavedCommands.load_commands() in src/hlpr/models/saved_commands.py
 
 ## Phase 3.4: Integration
-- [ ] T028 Integrate ProcessingOptions.to_cli_args() with existing CLI pipeline
-- [ ] T029 Connect enhanced guided workflow to existing _parse_with_progress()
-- [ ] T030 Connect enhanced guided workflow to existing _summarize_with_progress()
-- [ ] T031 Integrate template display with existing Rich error handling patterns
-- [ ] T032 Update guided mode CLI entry point to use enhanced workflow
+- [x] T028 Integrate ProcessingOptions.to_cli_args() with existing CLI pipeline
+- [x] T029 Connect enhanced guided workflow to existing _parse_with_progress()
+- [x] T030 Connect enhanced guided workflow to existing _summarize_with_progress()
+- [x] T031 Integrate template display with existing Rich error handling patterns
+- [x] T032 Update guided mode CLI entry point to use enhanced workflow
 
 ## Phase 3.5: Polish
-- [ ] T033 [P] Unit tests for ProcessingOptions validation in tests/unit/test_option_validation.py
-- [ ] T034 [P] Unit tests for CommandTemplate generation in tests/unit/test_template_generation.py
-- [ ] T035 [P] Unit tests for SavedCommands persistence in tests/unit/test_saved_commands.py
+- [x] T033 [P] Unit tests for ProcessingOptions validation in tests/unit/test_option_validation.py
+- [x] T034 [P] Unit tests for CommandTemplate generation in tests/unit/test_template_generation.py
+- [x] T035 [P] Unit tests for SavedCommands persistence in tests/unit/test_saved_commands.py
 - [ ] T036 Performance validation: UI responsiveness <100ms
 - [ ] T037 Execute quickstart.md validation scenarios
 - [ ] T038 Run final ruff check and format
@@ -200,3 +200,4 @@ Task: "Unit tests for SavedCommands persistence in tests/unit/test_saved_command
 **Total Tasks**: 39 tasks across 5 phases  
 **Parallel Opportunities**: 3 phases with parallel execution  
 **Estimated Implementation Time**: 6-8 hours with parallel execution
+````

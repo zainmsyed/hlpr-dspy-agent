@@ -1,7 +1,7 @@
 """Command template model used to persist and display saved command templates."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ class CommandTemplate(BaseModel):
         default_factory=dict,
         description="Serialized options used to create the template",
     )
-    created: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    created: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
     def from_options(

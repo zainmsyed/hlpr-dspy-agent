@@ -42,6 +42,7 @@ from hlpr.exceptions import (
 from hlpr.io.atomic import atomic_write_text
 from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
+from hlpr.models.saved_commands import SavedCommands
 
 logger = logging.getLogger(__name__)
 
@@ -657,6 +658,7 @@ def summarize_guided(
     output_format: str = typer.Option("rich", "--format", help="Output format [txt|md|json|rich]"),
     steps: int = typer.Option(3, help="Number of simulated steps for the guided flow"),
     simulate_work: bool = typer.Option(False, help="Simulate work during the guided flow"),
+    execute: bool = typer.Option(True, "--execute/--no-execute", help="Run parse+summarization after prompts (default: interactive execute)"),
 ) -> None:
     """Run the guided interactive summarization flow.
 
@@ -670,18 +672,102 @@ def summarize_guided(
     if sys.stdin.isatty():
         prompt_provider = RichTyperPromptProvider()
     session = InteractiveSession(display=display, prompt_provider=prompt_provider)
-    options = {
-        "steps": steps,
-        "simulate_work": simulate_work,
-        "provider": provider,
-        "output_format": output_format,
-    }
+
     try:
+        # Interactive default: prefer the high-level guided workflow which
+        # collects options (basic + advanced), runs processing, and generates
+        # command templates. This keeps guided mode interactive by default.
+        if execute:
+            # Collect options interactively (basic + advanced) and then run
+            # the real parse + summarization path. We avoid relying on the
+            # simulation-only run_with_phases here so guided mode actually
+            # performs processing when the user requests execution.
+            base_opts = session.collect_basic_options({"provider": provider, "format": output_format})
+            opts = session.collect_advanced_options(base_opts, {})
+
+            # Convert ProcessingOptions to plain dict for compatibility
+            opts_dict = opts.model_dump() if hasattr(opts, "model_dump") else dict(opts)
+            if "output_format" not in opts_dict and "format" in opts_dict:
+                opts_dict["output_format"] = opts_dict.get("format")
+
+            # Validate file existence before heavy work
+            path = Path(file_path)
+            if not path.exists() or not path.is_file():
+                display.show_error_panel("Validation Error", f"File not found or invalid: {file_path}")
+                raise typer.Exit(1)
+
+            # Parse the document with progress
+            document, extracted_text = _parse_with_progress(file_path, verbose=False)
+
+            # Build summarizer using options collected
+            timeout_val = CONFIG.default_timeout
+            summarizer = DocumentSummarizer(
+                provider=opts_dict.get("provider", "local"),
+                model=opts_dict.get("model", "gemma3:latest"),
+                temperature=opts_dict.get("temperature", 0.3),
+                timeout=timeout_val,
+            )
+
+            # Run summarization
+            result = _summarize_with_progress(
+                summarizer,
+                document,
+                extracted_text,
+                opts_dict.get("chunk_size", 8192),
+                opts_dict.get("chunk_overlap", 256),
+                opts_dict.get("chunking_strategy", "sentence"),
+                verbose=False,
+            )
+
+            # Display summary using requested format
+            _display_summary(document, result, opts_dict.get("output_format", "rich"))
+
+            # Persist command template for reproducibility (non-fatal)
+            try:
+                template = session.generate_command_template(opts)
+                saver = session.command_saver or SavedCommands()
+                try:
+                    saver.save_command(template)
+                except Exception:
+                    logger.warning("Failed to persist command template")
+                try:
+                    session.display_command_template(template)
+                except Exception:
+                    logger.warning("Failed to display command template")
+            except Exception:
+                logger.warning("Command template generation failed")
+
+        # Non-execute (--no-execute) legacy path: simulate phases using the
+        # lower-level run_with_phases to preserve test behavior and allow
+        # non-interactive demonstrations.
+        options = {
+            "steps": steps,
+            "simulate_work": simulate_work,
+            "provider": provider,
+            "output_format": output_format,
+        }
         res = session.run_with_phases(file_path, options)
         if res.get("status") == "error":
             display.show_error_panel("Guided Mode Error", res.get("message", "Unknown error"))
             raise typer.Exit(1)
         display.show_panel("Success", "Guided mode completed successfully")
+        return
+
+    except typer.Exit:
+        raise
+    except HlprError as he:
+        # Reuse upstream HlprError handling for better exit codes
+        if isinstance(he, DocumentProcessingError):
+            display.show_error_panel("Document error", str(he))
+            raise typer.Exit(6) from he
+        if isinstance(he, SummarizationError):
+            display.show_error_panel("Summarization error", str(he))
+            raise typer.Exit(5) from he
+        if isinstance(he, ConfigurationError):
+            display.show_error_panel("Configuration error", str(he))
+            raise typer.Exit(2) from he
+        display.show_error_panel("Error", str(he))
+        raise typer.Exit(3) from he
     except Exception as e:
         display.show_error_panel("Unexpected Error", str(e))
         raise typer.Exit(4) from e
