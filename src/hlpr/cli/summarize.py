@@ -736,6 +736,13 @@ def summarize_guided(
             except Exception:
                 logger.warning("Command template generation failed")
 
+            # We've completed the execute path; return to avoid running
+            # the legacy non-execute simulation path below. When this
+            # handler is invoked with execute=True we should not fall
+            # through to `run_with_phases` which expects different
+            # option types and is intended only for the simulated path.
+            return
+
         # Non-execute (--no-execute) legacy path: simulate phases using the
         # lower-level run_with_phases to preserve test behavior and allow
         # non-interactive demonstrations.
