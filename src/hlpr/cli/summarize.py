@@ -3,6 +3,7 @@
 import contextlib
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from hlpr.cli.models import (
     ProcessingMetadata,
     ProcessingResult,
 )
+from hlpr.cli.prompt_providers import RichTyperPromptProvider
 from hlpr.cli.renderers import (
     JsonRenderer,
     MarkdownRenderer,
@@ -662,7 +664,12 @@ def summarize_guided(
     provides a phase-aware progress UI used by tests and integration.
     """
     display = RichDisplay()
-    session = InteractiveSession(display=display)
+    # Use interactive Typer/Rich prompts when running in a TTY, otherwise
+    # fall back to defaults to allow non-interactive runs (tests/CI).
+    prompt_provider = None
+    if sys.stdin.isatty():
+        prompt_provider = RichTyperPromptProvider()
+    session = InteractiveSession(display=display, prompt_provider=prompt_provider)
     options = {
         "steps": steps,
         "simulate_work": simulate_work,

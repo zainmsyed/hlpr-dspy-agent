@@ -8,7 +8,7 @@ def test_processingoptions_model_validation():
     """
     try:
         from hlpr.models.interactive import ProcessingOptions
-    except Exception as e:
+    except ImportError as e:
         pytest.skip(f"ProcessingOptions not importable: {e}")
 
     # Temperature out of range should raise ValidationError

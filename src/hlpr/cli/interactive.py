@@ -5,11 +5,16 @@ Phase 3.4 to wire together validators and UI primitives. `pick_file` is a
 lightweight helper that can be replaced by a more interactive picker later.
 """
 import contextlib
+import logging
 import time
 from typing import Any, TypedDict
 
+from hlpr.cli.prompt_providers import DefaultPromptProvider, PromptProvider
 from hlpr.cli.rich_display import PhaseTracker, ProgressTracker, RichDisplay
 from hlpr.cli.validators import validate_config, validate_file_path
+from hlpr.models.interactive import ProcessingOptions
+from hlpr.models.saved_commands import SavedCommands
+from hlpr.models.templates import CommandTemplate
 
 __all__ = ["InteractiveSession", "pick_file"]
 
@@ -35,6 +40,8 @@ class InteractiveSession:
         self,
         display: RichDisplay | None = None,
         progress: ProgressTracker | None = None,
+        command_saver: SavedCommands | None = None,
+        prompt_provider: PromptProvider | None = None,
         **kwargs: Any,
     ) -> None:
         self.state: dict[str, Any] = dict(kwargs)
@@ -43,6 +50,9 @@ class InteractiveSession:
         # fake; if the import above fails because of module placement we
         # fallback to using RichDisplay directly.
         self.progress = progress or ProgressTracker()  # type: ignore[arg-type]
+        self.command_saver = command_saver
+        self.logger = logging.getLogger(__name__)
+        self.prompt_provider = prompt_provider or DefaultPromptProvider(kwargs)
 
     def run(self, file_path: str | None = None, options: dict[str, object] | None = None) -> SessionResult:
         """Run the guided flow for a single file.
@@ -125,6 +135,109 @@ class InteractiveSession:
 
         self.display.show_panel("Complete", "Processing finished successfully")
         return {"status": "ok", "message": "done", "error_type": None}
+
+    # --- Phase 3.3 additions -------------------------------------------------
+    def collect_basic_options(self, _defaults: dict | None = None) -> ProcessingOptions:
+        """Collect basic options (non-interactive defaults for tests).
+
+        Returns a ProcessingOptions instance populated from prompts/defaults.
+        """
+        provider = self.prompt_provider.provider_prompt()
+        fmt = self.prompt_provider.format_prompt()
+        temp = self.prompt_provider.temperature_prompt()
+        save, outpath = self.prompt_provider.save_file_prompt()
+        return ProcessingOptions(
+            provider=provider,
+            format=fmt,
+            temperature=temp,
+            save=save,
+            output_path=outpath,
+        )
+
+    def collect_advanced_options(self, base_options: ProcessingOptions, _defaults: dict | None = None) -> ProcessingOptions:
+        """Add advanced options onto a base ProcessingOptions instance."""
+        adv = self.prompt_provider.advanced_options_prompt()
+        # create a new instance copying base and updating advanced fields
+        data = base_options.model_dump() if hasattr(base_options, "model_dump") else base_options.dict()
+        data.update(adv)
+        return ProcessingOptions(**data)
+
+    def process_document_with_options(self, file_path: str, options: ProcessingOptions) -> SessionResult:
+        """Convenience wrapper to run the existing run_with_phases using ProcessingOptions."""
+        # Some existing validators expect the key 'output_format' instead of
+        # 'format'. Provide a compatibility shim here so interactive options
+        # remain ergonomic while satisfying the validator contract.
+        opts_dict = options.model_dump() if hasattr(options, "model_dump") else dict(options)
+        if "output_format" not in opts_dict and "format" in opts_dict:
+            opts_dict["output_format"] = opts_dict.get("format")
+        return self.run_with_phases(file_path, opts_dict)
+
+    def generate_command_template(self, options: ProcessingOptions) -> CommandTemplate:
+        """Generate a CommandTemplate from given options.
+
+        The command string is a simple hlpr CLI invocation with converted args.
+        """
+        args = options.to_cli_args() if hasattr(options, "to_cli_args") else []
+        cmd = "hlpr summarize document " + " ".join(args)
+        # use a simple id based on timestamp
+        from datetime import datetime
+
+        id = datetime.utcnow().isoformat() + "Z"
+        return CommandTemplate.from_options(id=id, command_template=cmd, options=options.model_dump() if hasattr(options, "model_dump") else dict(options))
+
+    def display_command_template(self, template: CommandTemplate) -> None:
+        """Display a generated command template using the RichDisplay panel."""
+        self.display.show_panel("Command Template", template.command_template)
+
+    def handle_keyboard_interrupt(self) -> None:
+        """Centralised keyboard interrupt handling hook for interactive flows."""
+        self.display.show_error_panel("Interrupted", "User cancelled the guided workflow")
+
+    def run_guided_workflow(self, file_path: str, defaults: dict | None = None) -> SessionResult | None:
+        """High-level guided workflow entry point used by CLI and tests.
+
+        Steps:
+        - collect basic options
+        - collect advanced options
+        - run processing with options
+        - generate and save command template
+        Returns the processing SessionResult or None on non-critical failures.
+        """
+        try:
+            base_opts = self.collect_basic_options(defaults)
+            opts = self.collect_advanced_options(base_opts, defaults)
+
+            # Run processing
+            result = self.process_document_with_options(file_path, opts)
+
+            # Generate and persist a command template for reproducibility
+            try:
+                template = self.generate_command_template(opts)
+                saver = self.command_saver or SavedCommands()
+                try:
+                    saver.save_command(template)
+                except Exception as e:
+                    # Log but don't fail the workflow
+                    self.logger.warning("Failed to persist command template: %s", e)
+                # display the template to the user
+                try:
+                    self.display_command_template(template)
+                except Exception as e:
+                    self.logger.warning("Failed to display command template: %s", e)
+            except Exception as e:
+                # non-fatal: template generation should not break processing
+                self.logger.warning("Command template generation failed: %s", e)
+
+            return result
+        except KeyboardInterrupt:
+            self.handle_keyboard_interrupt()
+            return {"status": "interrupted", "message": "cancelled", "error_type": "keyboard_interrupt"}
+        except Exception as exc:
+            # Surface unexpected errors via display and return an error result
+            with contextlib.suppress(Exception):
+                self.display.show_error_panel("Guided Workflow Error", str(exc))
+            return {"status": "error", "message": str(exc), "error_type": "guided_workflow"}
+
 
     def run_with_phases(
         self, file_path: str, options: dict[str, object],

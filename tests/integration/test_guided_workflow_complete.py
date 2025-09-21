@@ -7,7 +7,7 @@ def test_guided_workflow_end_to_end_smoke(tmp_path):
     """
     try:
         from hlpr.cli.interactive import InteractiveSession
-    except Exception as e:
+    except ImportError as e:
         pytest.skip(f"InteractiveSession not importable: {e}")
 
     sample = tmp_path / "sample.md"

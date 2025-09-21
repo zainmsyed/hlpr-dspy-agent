@@ -9,7 +9,7 @@ def test_guided_mode_has_run_method():
     """
     try:
         from hlpr.cli.interactive import InteractiveSession
-    except Exception as e:  # Import error means implementation not present
+    except ImportError as e:  # Import error means implementation not present
         pytest.skip(f"InteractiveSession not importable: {e}")
 
     session = InteractiveSession()
@@ -21,7 +21,7 @@ def test_command_template_generation_interface():
     """FR-007: InteractiveSession should provide template generation method."""
     try:
         from hlpr.cli.interactive import InteractiveSession
-    except Exception as e:
+    except ImportError as e:
         pytest.skip(f"InteractiveSession not importable: {e}")
 
     session = InteractiveSession()
@@ -32,7 +32,7 @@ def test_keyboard_interrupt_interface():
     """FR-009: Session should implement keyboard interrupt handler."""
     try:
         from hlpr.cli.interactive import InteractiveSession
-    except Exception as e:
+    except ImportError as e:
         pytest.skip(f"InteractiveSession not importable: {e}")
 
     session = InteractiveSession()
