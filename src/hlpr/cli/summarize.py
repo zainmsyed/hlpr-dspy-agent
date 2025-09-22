@@ -247,7 +247,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         metadata.append(f"File: {Path(document.path).name}\n")
         metadata.append(f"Format: {document.format.value.upper()}\n")
         metadata.append(f"Size: {document.size_bytes:,} bytes\n")
-        metadata.append(f"Processing time: {result.processing_time_ms}ms\n")
+        proc_ms = getattr(result, "processing_time_ms", None)
+        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        metadata.append(f"Processing time: {proc_seconds_str}\n")
         metadata.append("Provider: {}".format(getattr(result, "provider", "unknown")))
 
         metadata_panel = Panel(
@@ -270,6 +272,7 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
 
     elif output_format == "json":
         # JSON output
+        proc_ms = getattr(result, "processing_time_ms", None)
         output_data = {
             "file": str(Path(document.path).name),
             "format": document.format.value,
@@ -277,7 +280,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
             "summary": result.summary,
             "key_points": result.key_points,
             "hallucinations": getattr(result, "hallucinations", []),
-            "processing_time_ms": result.processing_time_ms,
+            "processing_time_ms": proc_ms,
+            "processing_time_seconds": (proc_ms / 1000.0) if proc_ms is not None else None,
+            "provider": getattr(result, "provider", None),
         }
         console.print_json(data=output_data)
 
@@ -286,7 +291,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         console.print(f"Document: {Path(document.path).name}")
         console.print(f"Format: {document.format.value.upper()}")
         console.print(f"Size: {document.size_bytes:,} bytes")
-        console.print(f"Processing time: {result.processing_time_ms}ms")
+        proc_ms = getattr(result, "processing_time_ms", None)
+        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        console.print(f"Processing time: {proc_seconds_str}")
         console.print()
         console.print("SUMMARY:")
         console.print(result.summary)
@@ -307,7 +314,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         console.print()
         console.print(f"- **Format**: {document.format.value.upper()}")
         console.print(f"- **Size**: {document.size_bytes:,} bytes")
-        console.print(f"- **Processing time**: {result.processing_time_ms}ms")
+        proc_ms = getattr(result, "processing_time_ms", None)
+        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        console.print(f"- **Processing time**: {proc_seconds_str}")
         console.print()
         console.print("## Summary")
         console.print()
@@ -380,7 +389,9 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
         content = f"# Document Summary: {Path(document.path).name}\n\n"
         content += f"- **Format**: {document.format.value.upper()}\n"
         content += f"- **Size**: {document.size_bytes:,} bytes\n"
-        content += f"- **Processing time**: {result.processing_time_ms}ms\n\n"
+        proc_ms = getattr(result, "processing_time_ms", None)
+        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        content += f"- **Processing time**: {proc_seconds_str}\n\n"
         content += "## Summary\n\n"
         content += f"{result.summary}\n\n"
         if result.key_points:
@@ -393,7 +404,9 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
     content = f"Document: {Path(document.path).name}\n"
     content += f"Format: {document.format.value.upper()}\n"
     content += f"Size: {document.size_bytes:,} bytes\n"
-    content += f"Processing time: {result.processing_time_ms}ms\n\n"
+    proc_ms = getattr(result, "processing_time_ms", None)
+    proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+    content += f"Processing time: {proc_seconds_str}\n\n"
     content += "SUMMARY:\n"
     content += f"{result.summary}\n\n"
     if result.key_points:

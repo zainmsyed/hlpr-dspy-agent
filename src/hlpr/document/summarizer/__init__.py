@@ -246,6 +246,7 @@ class DocumentSummarizer:
                 key_points=dspy_result.key_points,
                 processing_time_ms=dspy_result.processing_time_ms,
                 hallucinations=hallucinations,
+                provider=getattr(dspy_result, "provider", None) or self.provider,
             )
             if self.verify_hallucinations_flag and hallucinations:
                 result.hallucination_verification = (
@@ -335,6 +336,7 @@ class DocumentSummarizer:
                 key_points=final_result.key_points,
                 processing_time_ms=processing_time_ms,
                 hallucinations=getattr(final_result, "hallucinations", []),
+                provider=getattr(final_result, "provider", None) or self.provider,
             )
 
         except Exception as e:
@@ -377,6 +379,7 @@ class DocumentSummarizer:
             key_points=key_points,
             processing_time_ms=processing_time_ms,
             hallucinations=[],
+            provider=self.provider,
         )
 
     def _detect_hallucinations(self, source_text: str, summary_text: str) -> list[str]:
