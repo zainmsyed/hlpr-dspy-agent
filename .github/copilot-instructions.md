@@ -165,3 +165,26 @@ Developer checklist
 
 If anything here is unclear or you'd like this behavior changed (for example, make
 timeouts configurable per-environment), I can add a config flag and tests to enforce it.
+
+## Guided Mode Phase 3.5 — Quickstart & Validation
+
+These notes document the Quickstart validation steps executed for the Guided Workflow
+feature (branch: `004-guided-mode`) and the results observed during local verification.
+
+- Quickstart test documents were created at `/tmp/hlpr-test-docs/sample.md` and used
+  to exercise the guided flow non-interactively via `--execute --simulate-work`.
+- The guided command supports non-interactive flags: `--provider`, `--format`,
+  `--simulate-work`, and `--execute` which allows automated validation and CI-friendly runs.
+- Integration checks run:
+  - Performance integration test `tests/integration/test_document_performance.py` executed with
+    `PYTEST_PERF=1` and passed locally (parsing + summarization < 2s for the small sample).
+  - `uvx ruff check src/hlpr/cli/` passed with no lint issues.
+- Quickstart scenarios validated:
+  - Basic guided workflow (defaults accepted) — OK
+  - Non-interactive guided execution (simulate + execute) — OK
+  - Command template generation and display — OK
+
+Next recommended steps:
+- Add final contract/integration tests for guided mode to CI (if not already present).
+- Add unit tests ensuring prompt latency and interactive responsiveness under CI mocks.
+- Ensure `~/.hlpr/saved_commands.json` handling is covered by unit tests for atomic writes.

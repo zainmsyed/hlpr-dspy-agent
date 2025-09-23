@@ -11,6 +11,10 @@ from hlpr.config import CONFIG
 from hlpr.models.templates import CommandTemplate
 
 
+class SavedCommandsError(Exception):
+    """Raised when saving or loading saved commands fails for non-recoverable reasons."""
+
+
 class SavedCommands:
     """Simple file-backed manager for command templates.
 
@@ -58,7 +62,16 @@ class SavedCommands:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(json.dumps(raw, default=str))
             os.replace(tmp, self.storage_path)
-        except Exception:
+        except (OSError, PermissionError) as exc:
+            # Attempt to clean up the temp file, then raise a domain-specific error
             with contextlib.suppress(Exception):
                 os.remove(tmp)
-            raise
+            raise SavedCommandsError(
+                f"Failed to write saved commands to {self.storage_path}: {exc}"
+            ) from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            with contextlib.suppress(Exception):
+                os.remove(tmp)
+            raise SavedCommandsError(
+                f"Unexpected failure when writing saved commands: {exc}"
+            ) from exc
