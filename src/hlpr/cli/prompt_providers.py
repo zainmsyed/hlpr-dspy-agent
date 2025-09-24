@@ -16,6 +16,7 @@ import typer
 from rich.console import Console
 
 from hlpr.cli.prompts import OptionPrompts
+from hlpr.cli.help_display import HelpDisplay
 
 
 class PromptProvider(Protocol):
@@ -62,6 +63,10 @@ class InteractivePromptProvider:
 
     def __init__(self, defaults: dict[str, Any] | None = None) -> None:
         self.defaults = defaults or {}
+        # Use OptionPrompts for validation helpers and to obtain max attempts
+        self._prompts = OptionPrompts(self.defaults)
+        # HelpDisplay used to show contextual help when validation fails
+        self._help = self.defaults.get("help_display") or HelpDisplay()
 
     def _input_with_default(self, prompt: str, default: str) -> str:
         try:
@@ -71,10 +76,32 @@ class InteractivePromptProvider:
         return res.strip() or default
 
     def provider_prompt(self) -> str:
-        return self._input_with_default("Provider", str(self.defaults.get("provider", "local")))
+        default = str(self.defaults.get("provider", "local"))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            candidate = self._input_with_default("Provider", default)
+            valid, msg = self._prompts.validate_provider(candidate)
+            if valid:
+                return candidate
+            # validation failed: show message and contextual help
+            print(f"Invalid provider: {msg}")
+            self._help.show_provider_help()
+        # fallback to default after attempts exhausted
+        print(f"Max attempts exceeded, using default provider: {default}")
+        return default
 
     def format_prompt(self) -> str:
-        return self._input_with_default("Format", str(self.defaults.get("format", "rich")))
+        default = str(self.defaults.get("format", "rich"))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            candidate = self._input_with_default("Format", default)
+            valid, msg = self._prompts.validate_format(candidate)
+            if valid:
+                return candidate
+            print(f"Invalid format: {msg}")
+            self._help.show_format_help()
+        print(f"Max attempts exceeded, using default format: {default}")
+        return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:
         save_raw = self._input_with_default("Save output? (y/n)", "n")
@@ -85,18 +112,34 @@ class InteractivePromptProvider:
         return save, path
 
     def temperature_prompt(self) -> float:
-        raw = self._input_with_default("Temperature", str(self.defaults.get("temperature", 0.3)))
-        try:
-            return float(raw)
-        except Exception:
-            return float(self.defaults.get("temperature", 0.3))
+        default = float(self.defaults.get("temperature", 0.3))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            raw = self._input_with_default("Temperature", str(default))
+            valid, msg = self._prompts.validate_temperature(raw)
+            if valid:
+                try:
+                    return float(raw)
+                except Exception:
+                    return default
+            print(f"Invalid temperature: {msg}")
+        print(f"Max attempts exceeded, using default temperature: {default}")
+        return default
 
     def advanced_options_prompt(self) -> dict[str, Any]:
-        chunk = self._input_with_default("Chunk size", str(self.defaults.get("chunk_size", 8192)))
-        try:
-            return {"chunk_size": int(chunk)}
-        except Exception:
-            return {"chunk_size": int(self.defaults.get("chunk_size", 8192))}
+        default = int(self.defaults.get("chunk_size", 8192))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            chunk = self._input_with_default("Chunk size", str(default))
+            try:
+                val = int(chunk)
+                if val <= 0:
+                    raise ValueError("must be > 0")
+                return {"chunk_size": val}
+            except Exception:
+                print("Chunk size must be a positive integer")
+        print(f"Max attempts exceeded, using default chunk size: {default}")
+        return {"chunk_size": default}
 
 
 class RichTyperPromptProvider:
@@ -108,12 +151,34 @@ class RichTyperPromptProvider:
     def __init__(self, defaults: dict[str, Any] | None = None) -> None:
         self.defaults = defaults or {}
         self.console = Console()
+        self._prompts = OptionPrompts(self.defaults)
+        self._help = self.defaults.get("help_display") or HelpDisplay(self.console)
 
     def provider_prompt(self) -> str:
-        return typer.prompt("Provider", default=str(self.defaults.get("provider", "local")))
+        default = str(self.defaults.get("provider", "local"))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            candidate = typer.prompt("Provider", default=default)
+            valid, msg = self._prompts.validate_provider(candidate)
+            if valid:
+                return candidate
+            self.console.print(f"[red]Invalid provider:[/red] {msg}")
+            self._help.show_provider_help()
+        self.console.print(f"[yellow]Max attempts exceeded, using default provider:[/yellow] {default}")
+        return default
 
     def format_prompt(self) -> str:
-        return typer.prompt("Output format", default=str(self.defaults.get("format", "rich")))
+        default = str(self.defaults.get("format", "rich"))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            candidate = typer.prompt("Output format", default=default)
+            valid, msg = self._prompts.validate_format(candidate)
+            if valid:
+                return candidate
+            self.console.print(f"[red]Invalid format:[/red] {msg}")
+            self._help.show_format_help()
+        self.console.print(f"[yellow]Max attempts exceeded, using default format:[/yellow] {default}")
+        return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:
         save = typer.confirm("Save output to file?", default=bool(self.defaults.get("save", False)))
@@ -123,11 +188,31 @@ class RichTyperPromptProvider:
         return save, path
 
     def temperature_prompt(self) -> float:
-        return float(typer.prompt("Temperature", default=str(self.defaults.get("temperature", 0.3))))
+        default = float(self.defaults.get("temperature", 0.3))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            raw = typer.prompt("Temperature", default=str(default))
+            valid, msg = self._prompts.validate_temperature(raw)
+            if valid:
+                try:
+                    return float(raw)
+                except Exception:
+                    return default
+            self.console.print(f"[red]Invalid temperature:[/red] {msg}")
+        self.console.print(f"[yellow]Max attempts exceeded, using default temperature:[/yellow] {default}")
+        return default
 
     def advanced_options_prompt(self) -> dict[str, Any]:
-        chunk = typer.prompt("Chunk size", default=str(self.defaults.get("chunk_size", 8192)))
-        try:
-            return {"chunk_size": int(chunk)}
-        except Exception:
-            return {"chunk_size": int(self.defaults.get("chunk_size", 8192))}
+        default = int(self.defaults.get("chunk_size", 8192))
+        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        for attempt in range(max_attempts):
+            chunk = typer.prompt("Chunk size", default=str(default))
+            try:
+                val = int(chunk)
+                if val <= 0:
+                    raise ValueError("must be > 0")
+                return {"chunk_size": val}
+            except Exception:
+                self.console.print("[red]Chunk size must be a positive integer[/red]")
+        self.console.print(f"[yellow]Max attempts exceeded, using default chunk size:[/yellow] {default}")
+        return {"chunk_size": default}
