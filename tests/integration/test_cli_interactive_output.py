@@ -18,6 +18,16 @@ def test_interactive_output_shows_panels(tmp_path):
     assert res["status"] == "ok"
 
     out = console.export_text()
-    # basic assertions: panels should contain the strings
-    assert "Starting" in out or "Processing:" in out
-    assert "Complete" in out or "Processing finished successfully" in out
+    # basic assertions: panels should contain the strings (use centralized constants when available)
+    try:
+        import hlpr.config.ui_strings as ui_strings
+    except ImportError:
+        class _Fallback:
+            PANEL_STARTING = "Starting"
+            PANEL_COMPLETE = "Complete"
+            PROCESSING_FINISHED = "Processing finished successfully"
+
+        ui_strings = _Fallback()
+
+    assert ui_strings.PANEL_STARTING in out or "Processing:" in out
+    assert ui_strings.PANEL_COMPLETE in out or ui_strings.PROCESSING_FINISHED in out

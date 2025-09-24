@@ -31,6 +31,11 @@ from hlpr.cli.renderers import (
 )
 from hlpr.cli.rich_display import RichDisplay
 from hlpr.config import CONFIG
+from hlpr.config.ui_strings import (
+    FILE_NOT_FOUND,
+    NOT_A_FILE,
+    SUCCESS_GUIDED,
+)
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
 from hlpr.exceptions import (
@@ -126,11 +131,11 @@ def summarize_document(
     # Validate file exists (outside try to avoid TRY301)
     path = Path(file_path)
     if not path.exists():
-        console.print(f"[red]Error:[/red] File not found: {file_path}")
+        console.print(f"[red]Error:[/red] {FILE_NOT_FOUND.format(path=file_path)}")
         raise typer.Exit(1)
 
     if not path.is_file():
-        console.print(f"[red]Error:[/red] Path is not a file: {file_path}")
+        console.print(f"[red]Error:[/red] {NOT_A_FILE.format(path=file_path)}")
         raise typer.Exit(1)
 
     try:
@@ -435,7 +440,8 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
             msg = str(e).lower()
             if "unsupported" in msg or "unsupported file format" in msg:
                 err_msg = f"Unsupported file format: {e}"
-                desc = f"Unsupported format: {e}"
+                from hlpr.config.ui_strings import UNSUPPORTED_FORMAT_SIMPLE
+                desc = UNSUPPORTED_FORMAT_SIMPLE.format(fmt=str(e))
                 progress.update(parse_task, completed=True, description=desc)
                 console.print(f"[red]Error:[/red] {err_msg}")
                 raise typer.Exit(2) from e
@@ -450,7 +456,8 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
             msg = str(e).lower()
             if "unsupported" in msg or "unsupported file format" in msg:
                 err_msg = f"Unsupported file format: {e}"
-                desc = f"Unsupported format: {e}"
+                from hlpr.config.ui_strings import UNSUPPORTED_FORMAT_SIMPLE
+                desc = UNSUPPORTED_FORMAT_SIMPLE.format(fmt=str(e))
                 progress.update(parse_task, completed=True, description=desc)
                 console.print(f"[red]Error:[/red] {err_msg}")
                 raise typer.Exit(2) from e
@@ -557,7 +564,7 @@ def _display_meeting_summary(
             },
         )
     else:
-    # Provide human-friendly headers: Summary and Overview
+        # Provide human-friendly headers: Summary and Overview
         console.print("Summary")
         console.print(overview)
         console.print("\nOverview")
@@ -600,7 +607,7 @@ def summarize_meeting(
     """
     path = Path(file_path)
     if not path.exists() or not path.is_file():
-        console.print(f"[red]Error:[/red] File not found: {file_path}")
+        console.print(f"[red]Error:[/red] {FILE_NOT_FOUND.format(path=file_path)}")
         raise typer.Exit(1)
 
     if path.suffix.lower() not in {".txt", ".md"}:
@@ -704,8 +711,10 @@ def summarize_guided(
 
             # Validate file existence before heavy work
             path = Path(file_path)
+            from hlpr.config.ui_strings import PANEL_VALIDATION_ERROR
+
             if not path.exists() or not path.is_file():
-                display.show_error_panel("Validation Error", f"File not found or invalid: {file_path}")
+                display.show_error_panel(PANEL_VALIDATION_ERROR, FILE_NOT_FOUND.format(path=file_path))
                 raise typer.Exit(1)
 
             # Parse the document with progress
@@ -766,9 +775,12 @@ def summarize_guided(
         }
         res = session.run_with_phases(file_path, options)
         if res.get("status") == "error":
-            display.show_error_panel("Guided Mode Error", res.get("message", "Unknown error"))
+            from hlpr.config.ui_strings import PANEL_COMMAND_TEMPLATE
+            display.show_error_panel(PANEL_COMMAND_TEMPLATE, res.get("message", "Unknown error"))
             raise typer.Exit(1)
-        display.show_panel("Success", "Guided mode completed successfully")
+
+        # Display success
+        display.show_panel("Success", SUCCESS_GUIDED)
         return
 
     except typer.Exit:

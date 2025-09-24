@@ -1,7 +1,6 @@
-import pytest
 from hlpr.cli.interactive import InteractiveSession
-from hlpr.cli.rich_display import ProgressTracker
 from hlpr.cli.prompt_providers import DefaultPromptProvider
+from hlpr.cli.rich_display import ProgressTracker
 
 
 class DummyProgress(ProgressTracker):
@@ -13,7 +12,7 @@ class DummyProgress(ProgressTracker):
         super().start(total=total, description=description)
         self.started = True
 
-    def advance(self, steps: int = 1) -> None:
+    def advance(self, _steps: int = 1) -> None:
         # Simulate a user KeyboardInterrupt during processing
         raise KeyboardInterrupt()
 

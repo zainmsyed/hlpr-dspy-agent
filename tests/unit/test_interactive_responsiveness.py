@@ -1,8 +1,7 @@
+import os
 import time
 
 from hlpr.cli.interactive import InteractiveSession
-import os
-
 
 
 class FastPromptProvider:

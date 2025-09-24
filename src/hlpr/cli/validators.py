@@ -7,6 +7,19 @@ import os
 from collections.abc import Iterable
 from pathlib import Path
 
+from hlpr.config.ui_strings import (
+    ACCESS_COULD_NOT_BE_DETERMINED,
+    EMPTY_PATH_MSG,
+    FILE_NOT_FOUND,
+    FILE_NOT_FOUND_NO_EXT,
+    FILE_NOT_READABLE,
+    MISSING_REQUIRED_TEMPLATE,
+    NOT_A_FILE,
+    OPTIONS_MUST_BE_DICT,
+    SUGGEST_EMPTY_PATH,
+    UNSUPPORTED_FORMAT_TEMPLATE,
+)
+
 __all__ = [
     "resolve_config_conflicts",
     "suggest_file_fixes",
@@ -19,22 +32,28 @@ def validate_file_path(path: str) -> tuple[bool, str]:
     """Validate that `path` refers to a readable file.
 
     Returns (True, "ok") when valid, otherwise (False, <error message>).
+
+    The error messages are intentionally user-facing and provide actionable
+    next steps where possible (e.g., suggest checking cwd, adding extension).
     """
     if not isinstance(path, str) or not path:
-        return False, "empty path"
+        return False, EMPTY_PATH_MSG
 
     p = Path(path)
     if not p.exists():
-        return False, "path does not exist"
+        # Offer a hint when a likely extension is missing
+        if not p.suffix:
+            return False, FILE_NOT_FOUND_NO_EXT.format(path=path)
+        return False, FILE_NOT_FOUND.format(path=path)
 
     if not p.is_file():
-        return False, "path is not a file"
+        return False, NOT_A_FILE.format(path=path)
 
     try:
         if not os.access(path, os.R_OK):
-            return False, "file is not readable"
+            return False, FILE_NOT_READABLE.format(path=path)
     except OSError:
-        return False, "file accessibility could not be determined"
+        return False, ACCESS_COULD_NOT_BE_DETERMINED.format(path=path)
 
     return True, "ok"
 
@@ -47,17 +66,21 @@ def suggest_file_fixes(path: str) -> list[str]:
     """
     suggestions: list[str] = []
     if not isinstance(path, str) or not path:
-        suggestions.append("Provide a non-empty file path")
+        suggestions.append(SUGGEST_EMPTY_PATH)
         return suggestions
 
     p = Path(path)
     # Suggest adding common extensions if missing
     if not p.suffix:
-        suggestions.append(f"Did you mean '{path}.md' or '{path}.txt'?")
+        suggestions.append(f"Try adding a common extension: '{path}.md' or '{path}.txt'")
 
     # Suggest checking working directory when path looks relative
     if not p.is_absolute():
-        suggestions.append("Try using an absolute path or verify current working directory")
+        suggestions.append("Try using an absolute path or verify the current working directory (pwd)")
+
+    # Suggest checking for common typos (simple heuristic)
+    if path.count(" ") > 0:
+        suggestions.append("Paths with spaces may need quoting; try '" + path + "' or escape spaces")
 
     return suggestions
 
@@ -80,25 +103,29 @@ def validate_config(
     in allowed values. Returns (True, "ok") on success.
     """
     # Accept an empty dict as a valid (default) configuration to support
-    # callers that build options incrementally. This behavior is relied upon
-    # by contract tests which expect `validate_config({}) == (True, "ok")`.
+    # callers that build options incrementally. Contract tests expect
+    # `validate_config({}) == (True, "ok")`.
     if not isinstance(options, dict):
-        return False, "options must be a dict"
+        return False, OPTIONS_MUST_BE_DICT
 
     if not options:
         return True, "ok"
 
     for key in required_keys:
         if key not in options:
-            return False, f"missing required option: {key}"
+            return False, MISSING_REQUIRED_TEMPLATE.format(key=key, arg=key.replace("_", "-") or key)
 
     provider = options.get("provider")
     if provider not in allowed_providers:
-        return False, f"unsupported provider: {provider}"
+        allowed = ", ".join(allowed_providers)
+        from hlpr.config.ui_strings import UNSUPPORTED_PROVIDER_TEMPLATE
+
+        return False, UNSUPPORTED_PROVIDER_TEMPLATE.format(provider=provider, allowed=allowed)
 
     ofmt = options.get("output_format")
     if ofmt not in allowed_output_formats:
-        return False, f"unsupported output_format: {ofmt}"
+        allowed = ", ".join(allowed_output_formats)
+        return False, UNSUPPORTED_FORMAT_TEMPLATE.format(ofmt=ofmt, allowed=allowed)
 
     return True, "ok"
 

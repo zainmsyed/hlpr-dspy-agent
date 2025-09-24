@@ -10,16 +10,33 @@ import time
 from datetime import UTC
 from typing import Any, TypedDict
 
+from hlpr.cli import option_collectors
 from hlpr.cli.prompt_providers import DefaultPromptProvider, PromptProvider
 from hlpr.cli.rich_display import PhaseTracker, ProgressTracker, RichDisplay
 from hlpr.cli.validators import validate_config, validate_file_path
+from hlpr.config.ui_strings import (
+    PANEL_COMMAND_TEMPLATE,
+    PANEL_COMPLETE,
+    PANEL_GUIDED_WORKFLOW_ERROR,
+    PANEL_INTERRUPTED,
+    PANEL_PROCESSING_ERROR,
+    PANEL_STARTING,
+    PANEL_VALIDATION_ERROR,
+    PROCESSING_FINISHED,
+    PROCESSING_INTERRUPTED,
+    USER_CANCELLED,
+)
 from hlpr.models.interactive import ProcessingOptions
 from hlpr.models.saved_commands import SavedCommands
 from hlpr.models.templates import CommandTemplate
 
 __all__ = ["InteractiveSession", "pick_file"]
 
-PHASES: list[str] = ["Validation", "Processing", "Rendering"]
+PHASES: list[str] = [
+    __import__("hlpr.config.ui_strings", fromlist=["PHASE_VALIDATION"]).PHASE_VALIDATION,
+    __import__("hlpr.config.ui_strings", fromlist=["PHASE_PROCESSING"]).PHASE_PROCESSING,
+    __import__("hlpr.config.ui_strings", fromlist=["PHASE_RENDERING"]).PHASE_RENDERING,
+]
 DEFAULT_STEPS = 3
 
 
@@ -72,12 +89,12 @@ class InteractiveSession:
         try:
             ok, msg = validate_file_path(file_path)
         except Exception as exc:  # defensive: validators may raise on unexpected input
-            self.display.show_error_panel("Validation Error", f"File validation raised: {exc}")
+            self.display.show_error_panel(PANEL_VALIDATION_ERROR, f"File validation raised: {exc}")
             return {"status": "error", "message": str(exc), "error_type": "file_validation"}
         if not ok:
             # use the error panel helper for consistent styling
             self.display.show_error_panel(
-                "Validation Error",
+                PANEL_VALIDATION_ERROR,
                 f"File validation failed: {msg}",
             )
             return {
@@ -89,11 +106,11 @@ class InteractiveSession:
         try:
             ok, msg = validate_config(options)
         except Exception as exc:
-            self.display.show_error_panel("Validation Error", f"Options validation raised: {exc}")
+            self.display.show_error_panel(PANEL_VALIDATION_ERROR, f"Options validation raised: {exc}")
             return {"status": "error", "message": str(exc), "error_type": "options_validation"}
         if not ok:
             self.display.show_error_panel(
-                "Validation Error",
+                PANEL_VALIDATION_ERROR,
                 f"Options validation failed: {msg}",
             )
             return {
@@ -103,7 +120,7 @@ class InteractiveSession:
             }
 
         # show start
-        self.display.show_panel("Starting", f"Processing: {file_path}")
+        self.display.show_panel(PANEL_STARTING, f"Processing: {file_path}")
 
         # perform progress: configurable via options
         total = (
@@ -114,7 +131,10 @@ class InteractiveSession:
         simulate_work = bool(options.get("simulate_work", False))
 
         try:
-            self.progress.start(total=total, description="Processing")
+            # use centralized progress description where available
+            from hlpr.config.ui_strings import PROGRESS_WORKING
+
+            self.progress.start(total=total, description=PROGRESS_WORKING)
             for _ in range(total):
                 try:
                     if simulate_work:
@@ -125,8 +145,8 @@ class InteractiveSession:
                     # Allow graceful interruption: stop progress and persist state
                     self.progress.stop()
                     self.display.show_error_panel(
-                        "Interrupted",
-                        "Processing was interrupted by user. Partial results preserved.",
+                        PANEL_INTERRUPTED,
+                        PROCESSING_INTERRUPTED,
                     )
                     return {"status": "interrupted", "message": "partial", "error_type": "keyboard_interrupt"}
         finally:
@@ -134,30 +154,28 @@ class InteractiveSession:
             with contextlib.suppress(Exception):
                 self.progress.stop()
 
-        self.display.show_panel("Complete", "Processing finished successfully")
+        self.display.show_panel(PANEL_COMPLETE, PROCESSING_FINISHED)
         return {"status": "ok", "message": "done", "error_type": None}
 
     # --- Phase 3.3 additions -------------------------------------------------
     def collect_basic_options(self, _defaults: dict | None = None) -> ProcessingOptions:
-        """Collect basic options (non-interactive defaults for tests).
+        """Collect basic options (kept for compatibility).
 
-        Returns a ProcessingOptions instance populated from prompts/defaults.
+        Delegates to the `option_collectors.collect_basic_options` helper so
+        the extraction is testable and the InteractiveSession remains a thin
+        orchestration layer.
         """
-        provider = self.prompt_provider.provider_prompt()
-        fmt = self.prompt_provider.format_prompt()
-        temp = self.prompt_provider.temperature_prompt()
-        save, outpath = self.prompt_provider.save_file_prompt()
-        return ProcessingOptions(
-            provider=provider,
-            format=fmt,
-            temperature=temp,
-            save=save,
-            output_path=outpath,
-        )
+        return option_collectors.collect_basic_options(self.prompt_provider)
 
     def collect_advanced_options(self, base_options: ProcessingOptions, _defaults: dict | None = None) -> ProcessingOptions:
-        """Add advanced options onto a base ProcessingOptions instance."""
-        adv = self.prompt_provider.advanced_options_prompt()
+        """Add advanced options onto a base ProcessingOptions instance.
+
+        This method delegates to the `option_collectors.collect_advanced_options`
+        helper which returns a dict of advanced option updates. The method
+        preserves the original behavior by merging the dict into a new
+        ProcessingOptions instance.
+        """
+        adv = option_collectors.collect_advanced_options(base_options, self.prompt_provider)
         # create a new instance copying base and updating advanced fields
         data = base_options.model_dump() if hasattr(base_options, "model_dump") else base_options.dict()
         data.update(adv)
@@ -192,11 +210,11 @@ class InteractiveSession:
 
     def display_command_template(self, template: CommandTemplate) -> None:
         """Display a generated command template using the RichDisplay panel."""
-        self.display.show_panel("Command Template", template.command_template)
+        self.display.show_panel(PANEL_COMMAND_TEMPLATE, template.command_template)
 
     def handle_keyboard_interrupt(self) -> None:
         """Centralised keyboard interrupt handling hook for interactive flows."""
-        self.display.show_error_panel("Interrupted", "User cancelled the guided workflow")
+        self.display.show_error_panel(PANEL_INTERRUPTED, USER_CANCELLED)
 
     def run_guided_workflow(self, file_path: str, defaults: dict | None = None) -> SessionResult | None:
         """High-level guided workflow entry point used by CLI and tests.
@@ -240,7 +258,7 @@ class InteractiveSession:
         except Exception as exc:
             # Surface unexpected errors via display and return an error result
             with contextlib.suppress(Exception):
-                self.display.show_error_panel("Guided Workflow Error", str(exc))
+                self.display.show_error_panel(PANEL_GUIDED_WORKFLOW_ERROR, str(exc))
             return {"status": "error", "message": str(exc), "error_type": "guided_workflow"}
 
 
@@ -256,19 +274,19 @@ class InteractiveSession:
         try:
             ok, msg = validate_file_path(file_path)
         except Exception as exc:
-            self.display.show_error_panel("Validation Error", f"File validation raised: {exc}")
+            self.display.show_error_panel(PANEL_VALIDATION_ERROR, f"File validation raised: {exc}")
             return {"status": "error", "message": str(exc), "error_type": "file_validation"}
         if not ok:
-            self.display.show_error_panel("Validation Error", f"File validation failed: {msg}")
+            self.display.show_error_panel(PANEL_VALIDATION_ERROR, f"File validation failed: {msg}")
             return {"status": "error", "message": msg, "error_type": "file_validation"}
 
         try:
             ok, msg = validate_config(options)
         except Exception as exc:
-            self.display.show_error_panel("Validation Error", f"Options validation raised: {exc}")
+            self.display.show_error_panel(PANEL_VALIDATION_ERROR, f"Options validation raised: {exc}")
             return {"status": "error", "message": str(exc), "error_type": "options_validation"}
         if not ok:
-            self.display.show_error_panel("Validation Error", f"Options validation failed: {msg}")
+            self.display.show_error_panel(PANEL_VALIDATION_ERROR, f"Options validation failed: {msg}")
             return {"status": "error", "message": msg, "error_type": "options_validation"}
 
         # Multi-phase processing
@@ -289,7 +307,7 @@ class InteractiveSession:
                 except KeyboardInterrupt:
                     phase_tracker.stop()
                     self.display.show_error_panel(
-                        "Interrupted",
+                        PANEL_INTERRUPTED,
                         "Validation phase interrupted. Partial progress preserved.",
                     )
                     return {"status": "interrupted", "message": "partial", "error_type": "keyboard_interrupt"}
@@ -308,7 +326,7 @@ class InteractiveSession:
                     except KeyboardInterrupt:
                         phase_tracker.stop()
                         self.display.show_error_panel(
-                            "Interrupted",
+                            PANEL_INTERRUPTED,
                             "Processing phase interrupted. Partial progress preserved.",
                         )
                         return {"status": "interrupted", "message": "partial", "error_type": "keyboard_interrupt"}
@@ -324,17 +342,17 @@ class InteractiveSession:
                     except KeyboardInterrupt:
                         phase_tracker.stop()
                         self.display.show_error_panel(
-                            "Interrupted",
+                            PANEL_INTERRUPTED,
                             "Rendering phase interrupted. Partial progress preserved.",
                         )
                         return {"status": "interrupted", "message": "partial", "error_type": "keyboard_interrupt"}
         except Exception as exc:
             # unexpected errors during phases should be surfaced nicely
-            self.display.show_error_panel("Processing Error", str(exc))
+            self.display.show_error_panel(PANEL_PROCESSING_ERROR, str(exc))
             return {"status": "error", "message": str(exc), "error_type": "processing_error"}
 
         self.display.show_panel(
-            "Complete",
+            PANEL_COMPLETE,
             f"Processing finished successfully\n"
             f"Overall progress: {phase_tracker.overall_percentage:.1f}%",
         )

@@ -1,8 +1,5 @@
-import json
-import os
-import stat
-import tempfile
 import pytest
+
 from hlpr.models.saved_commands import SavedCommands, SavedCommandsError
 from hlpr.models.templates import CommandTemplate
 

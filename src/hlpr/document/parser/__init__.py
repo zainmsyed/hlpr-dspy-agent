@@ -18,6 +18,7 @@ except ModuleNotFoundError:
 from docx import Document as DocxDocument
 
 from hlpr.config import CONFIG
+from hlpr.config.ui_strings import FILE_NOT_FOUND, FORMAT_UNSUPPORTED_TEMPLATE
 from hlpr.exceptions import DocumentProcessingError
 from hlpr.models.document import Document, FileFormat
 
@@ -57,14 +58,15 @@ class DocumentParser:
         path = Path(file_path)
 
         if not path.exists():
-            msg = f"File not found: {file_path}"
+            msg = FILE_NOT_FOUND.format(path=file_path)
             raise FileNotFoundError(msg)
 
         extension = path.suffix.lower().lstrip(".")
         try:
             file_format = FileFormat(extension)
         except ValueError:
-            msg = f"Unsupported file format: {extension}"
+            allowed = ",".join([f.name.lower() for f in FileFormat])
+            msg = FORMAT_UNSUPPORTED_TEMPLATE.format(ofmt=extension, allowed=allowed)
             # Raise domain-specific error for unsupported format
             raise (
                 DocumentProcessingError(

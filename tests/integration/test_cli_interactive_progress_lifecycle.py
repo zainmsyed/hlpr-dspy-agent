@@ -22,5 +22,22 @@ def test_progress_lifecycle_and_percentage(tmp_path):
     assert progress.percentage == 100
 
     out = console.export_text()
-    assert "Processing" in out
-    assert "Complete" in out
+    # Accept either legacy 'Processing' or the centralized progress description
+    try:
+        import hlpr.config.ui_strings as ui_strings
+    except ImportError:
+        class _Fallback:
+            PROGRESS_WORKING = "Working"
+
+        ui_strings = _Fallback()
+
+    assert ("Processing" in out) or (ui_strings.PROGRESS_WORKING in out)
+    try:
+        import hlpr.config.ui_strings as ui_strings
+    except ImportError:
+        class _Fallback:
+            PANEL_COMPLETE = "Complete"
+
+        ui_strings = _Fallback()
+
+    assert ui_strings.PANEL_COMPLETE in out

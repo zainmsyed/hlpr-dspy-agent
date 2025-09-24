@@ -12,7 +12,10 @@ from hlpr.models.templates import CommandTemplate
 
 
 class SavedCommandsError(Exception):
-    """Raised when saving or loading saved commands fails for non-recoverable reasons."""
+    """
+    Raised when saving or loading saved commands fails for
+    non-recoverable reasons.
+    """
 
 
 class SavedCommands:

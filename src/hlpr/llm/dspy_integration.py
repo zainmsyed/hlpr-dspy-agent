@@ -181,8 +181,10 @@ class DSPyDocumentSummarizer:
             "groq",
             "together",
         ]
-        msg = (
-            f"Unsupported provider: {self.provider}. Supported: {supported_providers}"
+        from hlpr.config.ui_strings import UNSUPPORTED_PROVIDER_TEMPLATE
+
+        msg = UNSUPPORTED_PROVIDER_TEMPLATE.format(
+            provider=self.provider, allowed=", ".join(supported_providers)
         )
         raise ConfigurationError(msg)
 

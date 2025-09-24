@@ -22,5 +22,13 @@ def test_interactive_session_with_phases(tmp_path):
 
     # Check that console output contains phase information
     out = console.export_text()
-    assert "Complete" in out
+    try:
+        import hlpr.config.ui_strings as ui_strings
+    except ImportError:
+        class _Fallback:
+            PANEL_COMPLETE = "Complete"
+
+        ui_strings = _Fallback()
+
+    assert ui_strings.PANEL_COMPLETE in out
     assert "Overall progress:" in out
