@@ -8,6 +8,53 @@ from rich.console import Console
 app = typer.Typer(help="Configuration commands")
 console = Console()
 
+from hlpr.models.user_preferences import PreferencesStore, UserPreferences
+
+# Preferences sub-app
+preferences_app = typer.Typer(name="preferences", help="Manage user preferences")
+
+
+@preferences_app.command("show")
+def show_preferences() -> None:
+    """Show stored user preferences."""
+    store = PreferencesStore()
+    prefs = store.load()
+    console.print_json(data={
+        "theme": prefs.theme,
+        "last_provider": prefs.last_provider,
+        "last_format": prefs.last_format,
+    })
+    raise typer.Exit(0)
+
+
+@preferences_app.command("set")
+def set_preference(key: str, value: str) -> None:
+    """Set a preference key to a value. Valid keys: theme, last_provider, last_format"""
+    store = PreferencesStore()
+    prefs = store.load()
+    if not hasattr(prefs, key):
+        console.print(f"Invalid preference: {key}")
+        raise typer.Exit(2)
+    setattr(prefs, key, value)
+    store.save(prefs)
+    console.print(f"Set preference {key} to {value}")
+    raise typer.Exit(0)
+
+
+@preferences_app.command("reset")
+def reset_preferences() -> None:
+    """Reset preferences to defaults."""
+    store = PreferencesStore()
+    prefs = UserPreferences()
+    store.save(prefs)
+    console.print("Preferences reset to defaults")
+    raise typer.Exit(0)
+
+
+# mount preferences sub-app
+app.add_typer(preferences_app, name="preferences")
+
+
 _config = {
     "default_llm": "local",
     "providers": {},
