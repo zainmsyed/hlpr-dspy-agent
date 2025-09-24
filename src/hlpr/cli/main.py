@@ -7,6 +7,7 @@ from hlpr.cli import config as config_module
 from hlpr.cli import email as email_module
 from hlpr.cli import providers as providers_module
 from hlpr.cli.summarize import app as summarize_app
+from hlpr.cli import template_commands as template_commands_module
 
 # Create main app
 app = typer.Typer(
@@ -20,6 +21,7 @@ app.add_typer(summarize_app, name="summarize")
 app.add_typer(providers_module.app, name="providers")
 app.add_typer(config_module.app, name="config")
 app.add_typer(email_module.app, name="email")
+app.add_typer(template_commands_module.app, name="template")
 
 # Global console for rich output
 console = Console()

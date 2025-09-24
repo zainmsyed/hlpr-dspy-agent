@@ -122,7 +122,7 @@ Single project structure (existing hlpr codebase):
 ### Recent updates (automated edit)
 - [x] T044 Create centralized configuration constants in src/hlpr/config/guided.py (completed)
 - [x] T045 Implement custom exception hierarchy in src/hlpr/exceptions/guided.py (completed)
-- [ ] T046 Externalize UI strings and messages in src/hlpr/config/ui_strings.py (in-progress)
+- [x] T046 Externalize UI strings and messages in src/hlpr/config/ui_strings.py (completed)
 - [x] T046.b Centralize provider messages in DSPy and validators (completed)
 
 ### Recommendations (next immediate steps for T044-T048)
@@ -133,8 +133,8 @@ Single project structure (existing hlpr codebase):
 - T048 (naming): Adopt `snake_case` for CLI method names and prefix interactive lifecycle methods with `run_`/`collect_` to standardize across the module.
 
 ### Feature Completeness (Parallel Implementation)  
-- [ ] T049 [P] Add user preferences persistence in src/hlpr/models/user_preferences.py
-- [ ] T050 [P] Implement template management CLI commands in src/hlpr/cli/template_commands.py
+- [x] T049 [P] Add user preferences persistence in src/hlpr/models/user_preferences.py
+- [x] T050 [P] Implement template management CLI commands in src/hlpr/cli/template_commands.py
 - [ ] T051 [P] Add interactive file picker/browser in src/hlpr/cli/file_picker.py
 - [ ] T052 [P] Implement configuration reset functionality in src/hlpr/cli/config_commands.py
 
