@@ -6,8 +6,8 @@ from rich.console import Console
 from hlpr.cli import config as config_module
 from hlpr.cli import email as email_module
 from hlpr.cli import providers as providers_module
-from hlpr.cli.summarize import app as summarize_app
 from hlpr.cli import template_commands as template_commands_module
+from hlpr.cli.summarize import app as summarize_app
 
 # Create main app
 app = typer.Typer(
@@ -56,6 +56,21 @@ def version() -> None:
     """Show version information."""
     console.print("hlpr v0.1.0")
     console.print("Personal AI Assistant")
+
+
+@app.command(name="file-picker")
+def file_picker_command() -> None:
+    """Placeholder for the file-picker command.
+
+    The interactive file picker has been removed for now. Calling this
+    command will show a short message rather than attempting to import
+    missing module `hlpr.cli.file_picker`.
+    """
+    from rich.console import Console
+    console = Console()
+    console.print("The interactive file picker has been removed from this build.")
+    # Previously: from hlpr.cli.file_picker import main as fp_main
+    # fp_main(root, depth)
 
 
 if __name__ == "__main__":

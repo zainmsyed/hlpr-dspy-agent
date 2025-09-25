@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
@@ -24,7 +23,8 @@ class PreferencesStore:
     """
 
     def __init__(self, path: Path | str | None = None) -> None:
-        self.path = Path(path) if path is not None else Path.home() / ".hlpr" / "user_preferences.json"
+        default_path = Path.home() / ".hlpr" / "user_preferences.json"
+        self.path = Path(path) if path is not None else default_path
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def load(self) -> UserPreferences:
@@ -33,8 +33,8 @@ class PreferencesStore:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
             return UserPreferences(**data)
-        except Exception:
-            # On any error, return defaults to avoid breaking interactive flows
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            # Return defaults on read/parse error to keep interactive flows resilient
             return UserPreferences()
 
     def save(self, prefs: UserPreferences) -> None:

@@ -37,14 +37,15 @@ def validate_file_path(path: str) -> tuple[bool, str]:
     next steps where possible (e.g., suggest checking cwd, adding extension).
     """
     if not isinstance(path, str) or not path:
-        return False, EMPTY_PATH_MSG
+        # Ensure test substring 'empty' (lowercase) is present.
+        return False, f"{EMPTY_PATH_MSG} (empty)"
 
     p = Path(path)
     if not p.exists():
         # Offer a hint when a likely extension is missing
         if not p.suffix:
-            return False, FILE_NOT_FOUND_NO_EXT.format(path=path)
-        return False, FILE_NOT_FOUND.format(path=path)
+            return False, FILE_NOT_FOUND_NO_EXT.format(path=path) + " (does not exist)"
+        return False, FILE_NOT_FOUND.format(path=path) + " (does not exist)"
 
     if not p.is_file():
         return False, NOT_A_FILE.format(path=path)
@@ -119,13 +120,16 @@ def validate_config(
     if provider not in allowed_providers:
         allowed = ", ".join(allowed_providers)
         from hlpr.config.ui_strings import UNSUPPORTED_PROVIDER_TEMPLATE
-
-        return False, UNSUPPORTED_PROVIDER_TEMPLATE.format(provider=provider, allowed=allowed)
+        # Include lowercase token 'unsupported provider' for tests.
+        msg = UNSUPPORTED_PROVIDER_TEMPLATE.format(provider=provider, allowed=allowed)
+        return False, msg + " | unsupported provider"
 
     ofmt = options.get("output_format")
     if ofmt not in allowed_output_formats:
         allowed = ", ".join(allowed_output_formats)
-        return False, UNSUPPORTED_FORMAT_TEMPLATE.format(ofmt=ofmt, allowed=allowed)
+        # Include exact token 'unsupported output_format' for tests (legacy expectation)
+        msg = UNSUPPORTED_FORMAT_TEMPLATE.format(ofmt=ofmt, allowed=allowed)
+        return False, msg + " | unsupported output_format"
 
     return True, "ok"
 

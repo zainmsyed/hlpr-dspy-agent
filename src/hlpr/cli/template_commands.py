@@ -6,13 +6,12 @@ future UX enhancements.
 """
 from __future__ import annotations
 
-from typing import Optional
+from datetime import UTC
 
 import typer
 
 from hlpr.models.saved_commands import SavedCommands
 from hlpr.models.templates import CommandTemplate
-
 
 app = typer.Typer(name="template")
 
@@ -30,7 +29,7 @@ def list_templates() -> None:
 
 
 @app.command("show")
-def show_template(template_id: Optional[str] = typer.Argument(None, help="Template id to show")) -> None:
+def show_template(template_id: str | None = typer.Argument(None, help="Template id to show")) -> None:
     """Show a saved template by id.
 
     If no TEMPLATE_ID is provided, list available templates and prompt the
@@ -46,9 +45,9 @@ def show_template(template_id: Optional[str] = typer.Argument(None, help="Templa
     # If no id provided, present an interactive numbered list for selection.
     if template_id is None:
         from rich.console import Console
+        from rich.panel import Panel
         from rich.prompt import IntPrompt
         from rich.table import Table
-        from rich.panel import Panel
 
         console = Console()
 
@@ -84,8 +83,8 @@ def show_template(template_id: Optional[str] = typer.Argument(None, help="Templa
                     continue
                 idx = int(choice) - 1
                 break
-            except KeyboardInterrupt:
-                raise typer.Exit(1)
+            except KeyboardInterrupt as exc:
+                raise typer.Exit(1) from exc
             except Exception:
                 console.print("💩 Invalid input — please enter a number")
                 continue
@@ -118,18 +117,19 @@ def delete_template(template_id: str) -> None:
 
 
 @app.command("save")
-def save_template(command: str, name: Optional[str] = None) -> None:
-    """Save a raw command string as a template."""
+def save_template(command: str, name_: str | None = None) -> None:  # name_ optional user-provided id
+    """Save a raw command string as a template.
+
+    If a name is supplied it will be used as the template id; otherwise
+    a timestamp-based id is generated.
+    """
     store = SavedCommands()
-    from datetime import datetime, timezone
-    tmpl = CommandTemplate.from_options(
-        id=f"cmd_{int(datetime.now(timezone.utc).timestamp())}",
-        command_template=command,
-        options={},
-    )
+    from datetime import datetime
+    tmpl_id = name_ or f"cmd_{int(datetime.now(UTC).timestamp())}"
+    tmpl = CommandTemplate.from_options(id=tmpl_id, command_template=command, options={})
     try:
         store.save_command(tmpl)
         typer.echo(f"Saved template {tmpl.id}")
     except Exception as exc:
         typer.echo(f"Failed to save template: {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc

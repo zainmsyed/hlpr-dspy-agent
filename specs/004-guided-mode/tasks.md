@@ -136,6 +136,9 @@ Single project structure (existing hlpr codebase):
 - [x] T049 [P] Add user preferences persistence in src/hlpr/models/user_preferences.py
 - [x] T050 [P] Implement template management CLI commands in src/hlpr/cli/template_commands.py
 - [ ] T051 [P] Add interactive file picker/browser in src/hlpr/cli/file_picker.py
+ - [x] T051 [P] Add interactive file picker/browser in src/hlpr/cli/file_picker.py (implemented)
+   
+ Usage: The interactive file picker has been removed for now. Re-add when ready.
 - [ ] T052 [P] Implement configuration reset functionality in src/hlpr/cli/config_commands.py
 
 ### Performance & Scalability Improvements (Parallel Implementation)

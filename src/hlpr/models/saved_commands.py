@@ -1,6 +1,7 @@
 """Manager for saving and loading command templates."""
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import os
@@ -12,9 +13,9 @@ from hlpr.models.templates import CommandTemplate
 
 
 class SavedCommandsError(Exception):
-    """
-    Raised when saving or loading saved commands fails for
-    non-recoverable reasons.
+    """Raised when saving or loading saved commands fails.
+
+    Applies to non-recoverable persistence/serialization errors.
     """
 
 
@@ -78,3 +79,22 @@ class SavedCommands:
             raise SavedCommandsError(
                 f"Unexpected failure when writing saved commands: {exc}"
             ) from exc
+
+    # ---- Async helpers (use asyncio.to_thread to avoid adding aiofiles) ----
+    async def save_command_async(self, template: CommandTemplate) -> None:
+        """Async wrapper for save_command.
+
+        Offloads the synchronous save to a thread to avoid blocking an event loop.
+        """
+        await asyncio.to_thread(self.save_command, template)
+
+    async def load_commands_async(self) -> list[CommandTemplate]:
+        """Async wrapper for load_commands.
+
+        Returns the list of CommandTemplate instances.
+        """
+        return await asyncio.to_thread(self.load_commands)
+
+    async def _atomic_write_async(self, commands: list[CommandTemplate]) -> None:
+        """Async wrapper around the atomic write helper."""
+        await asyncio.to_thread(self._atomic_write, commands)

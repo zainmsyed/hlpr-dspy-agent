@@ -5,10 +5,10 @@ from typing import NoReturn
 import typer
 from rich.console import Console
 
+from hlpr.models.user_preferences import PreferencesStore, UserPreferences
+
 app = typer.Typer(help="Configuration commands")
 console = Console()
-
-from hlpr.models.user_preferences import PreferencesStore, UserPreferences
 
 # Preferences sub-app
 preferences_app = typer.Typer(name="preferences", help="Manage user preferences")
@@ -53,6 +53,15 @@ def reset_preferences() -> None:
 
 # mount preferences sub-app
 app.add_typer(preferences_app, name="preferences")
+
+# Mount guided-mode config commands (lazy import to avoid heavy imports at module load)
+try:
+    from hlpr.cli import config_commands as _config_commands_module
+
+    app.add_typer(_config_commands_module.app, name="guided")
+except Exception:
+    # If import fails (e.g., in some tests or trimmed environments), skip wiring.
+    pass
 
 
 _config = {

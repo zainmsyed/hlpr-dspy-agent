@@ -15,8 +15,8 @@ from typing import Any, Protocol
 import typer
 from rich.console import Console
 
-from hlpr.cli.prompts import OptionPrompts
 from hlpr.cli.help_display import HelpDisplay
+from hlpr.cli.prompts import OptionPrompts
 
 
 class PromptProvider(Protocol):
@@ -78,29 +78,29 @@ class InteractivePromptProvider:
     def provider_prompt(self) -> str:
         default = str(self.defaults.get("provider", "local"))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             candidate = self._input_with_default("Provider", default)
             valid, msg = self._prompts.validate_provider(candidate)
             if valid:
                 return candidate
             # validation failed: show message and contextual help
-            print(f"Invalid provider: {msg}")
+            typer.echo(f"Invalid provider: {msg}")
             self._help.show_provider_help()
         # fallback to default after attempts exhausted
-        print(f"Max attempts exceeded, using default provider: {default}")
+        typer.echo(f"Max attempts exceeded, using default provider: {default}")
         return default
 
     def format_prompt(self) -> str:
         default = str(self.defaults.get("format", "rich"))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             candidate = self._input_with_default("Format", default)
             valid, msg = self._prompts.validate_format(candidate)
             if valid:
                 return candidate
-            print(f"Invalid format: {msg}")
+            typer.echo(f"Invalid format: {msg}")
             self._help.show_format_help()
-        print(f"Max attempts exceeded, using default format: {default}")
+        typer.echo(f"Max attempts exceeded, using default format: {default}")
         return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:
@@ -114,7 +114,7 @@ class InteractivePromptProvider:
     def temperature_prompt(self) -> float:
         default = float(self.defaults.get("temperature", 0.3))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             raw = self._input_with_default("Temperature", str(default))
             valid, msg = self._prompts.validate_temperature(raw)
             if valid:
@@ -122,14 +122,14 @@ class InteractivePromptProvider:
                     return float(raw)
                 except Exception:
                     return default
-            print(f"Invalid temperature: {msg}")
-        print(f"Max attempts exceeded, using default temperature: {default}")
+            typer.echo(f"Invalid temperature: {msg}")
+        typer.echo(f"Max attempts exceeded, using default temperature: {default}")
         return default
 
     def advanced_options_prompt(self) -> dict[str, Any]:
         default = int(self.defaults.get("chunk_size", 8192))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             chunk = self._input_with_default("Chunk size", str(default))
             try:
                 val = int(chunk)
@@ -137,8 +137,8 @@ class InteractivePromptProvider:
                     raise ValueError("must be > 0")
                 return {"chunk_size": val}
             except Exception:
-                print("Chunk size must be a positive integer")
-        print(f"Max attempts exceeded, using default chunk size: {default}")
+                typer.echo("Chunk size must be a positive integer")
+        typer.echo(f"Max attempts exceeded, using default chunk size: {default}")
         return {"chunk_size": default}
 
 
@@ -157,7 +157,7 @@ class RichTyperPromptProvider:
     def provider_prompt(self) -> str:
         default = str(self.defaults.get("provider", "local"))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             candidate = typer.prompt("Provider", default=default)
             valid, msg = self._prompts.validate_provider(candidate)
             if valid:
@@ -170,7 +170,7 @@ class RichTyperPromptProvider:
     def format_prompt(self) -> str:
         default = str(self.defaults.get("format", "rich"))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             candidate = typer.prompt("Output format", default=default)
             valid, msg = self._prompts.validate_format(candidate)
             if valid:
@@ -190,7 +190,7 @@ class RichTyperPromptProvider:
     def temperature_prompt(self) -> float:
         default = float(self.defaults.get("temperature", 0.3))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             raw = typer.prompt("Temperature", default=str(default))
             valid, msg = self._prompts.validate_temperature(raw)
             if valid:
@@ -205,7 +205,7 @@ class RichTyperPromptProvider:
     def advanced_options_prompt(self) -> dict[str, Any]:
         default = int(self.defaults.get("chunk_size", 8192))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             chunk = typer.prompt("Chunk size", default=str(default))
             try:
                 val = int(chunk)
