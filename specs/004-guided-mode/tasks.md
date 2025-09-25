@@ -3,11 +3,16 @@
 **Input**: Design documents from `/specs/004-guided-mode/`
 **Prerequisites**: plan.md (required), research.md, data-model.md, contracts/
 
-````markdown
-# Tasks: Robust Guided Workflow for Document Summarization
+<!-- RESCOPED: Feature 004 now limited to guided workflow core. Cross-cutting infra moved to future features (see Future Features Reference). -->
 
-**Input**: Design documents from `/specs/004-guided-mode/`
-**Prerequisites**: plan.md (required), research.md, data-model.md, contracts/
+## Scope Adjustment (2025-09-25)
+The following tasks originally present in Feature 004 have been reclassified as platform-wide infrastructure and moved to separate upcoming feature epics:
+- Configuration & UI infrastructure: T044, T046, T052, T060
+- CLI Experience & Validation: T040, T041, T042, T043, T048, T057
+- Document Pipeline & Performance: T053, T054, T055, T056, T058
+- Persistence & Security: T049, T050, T051, T059
+
+They are tracked under new epic task T070 (see below) and will receive dedicated specs.
 
 ## Execution Flow (main)
 ```
@@ -144,7 +149,7 @@ Single project structure (existing hlpr codebase):
 ### Performance & Scalability Improvements (Parallel Implementation)
 - [x] T053 [P] Add async file operations for template saves in src/hlpr/models/saved_commands.py
 - [x] T054 [P] Implement progress indicators for all operations in src/hlpr/cli/rich_display.py  # Completed: added RichDisplay.operation_progress context manager and unit tests
-- [ ] T055 [P] Add memory-efficient document handling for guided mode
+- [x] T055 [P] Add memory-efficient document handling for guided mode  # Completed: added file size check and user confirmation for large files in guided mode
 - [ ] T056 [P] Create batch processing support for guided workflow in src/hlpr/cli/batch_guided.py
 
 ### Security & Validation Enhancements (Parallel Implementation)
@@ -316,3 +321,41 @@ Task: "Security tests for input validation in tests/security/test_input_validati
 **Enhancement Implementation**: Ready for execution (T040-T068)  
 **Estimated Enhancement Time**: 8-12 hours with parallel execution  
 **Priority**: High-priority code review recommendations integrated as tasks T040-T060
+
+# Future Features Reference
+
+## Epic T070: Modular Platform Enhancements (EXTRACTED)
+This epic represents cross-cutting enhancements removed from the guided workflow scope to preserve modularity and constitutional alignment.
+
+### Feature 005 - Core Configuration & UI
+- Centralize configuration constants (extend T044)
+- UI string externalization (extend T046)
+- Configuration reset & recovery (T052, T060)
+
+### Feature 006 - CLI Infrastructure & Validation
+- Enhanced error & validation UX (T040, T041, T043, T057)
+- In-app help & descriptive prompts (T042)
+- Naming standardization across CLI (T048)
+
+### Feature 007 - Document Processing Pipeline
+- Async file/template ops (T053)
+- Unified progress instrumentation (T054)
+- Memory-efficient parsing (generalize T055)
+- Batch processing & orchestration (generalize T056)
+- Error taxonomy expansion (T058)
+
+### Feature 008 - Persistence & Secure Storage
+- User preferences lifecycle (T049)
+- Template management CLI expansion (T050)
+- Secure storage permissions & hardening (T059)
+- (Revisit) Interactive file picker revival (T051)
+
+### Migration Notes
+- All code already merged for some tasks (e.g., T054) will be referenced—not duplicated.
+- New specs will define acceptance criteria & additional tests for platform-wide behavior.
+
+---
+## Future Work Reference
+A consolidated design document has been added at `documents/future_features_modularization.md` detailing rationale, sequencing, and acceptance criteria.
+
+<!-- End of rescope additions -->

@@ -12,6 +12,8 @@ wheels/
 # Virtual environments
 .venv
 documents/
+# Allow specific project reference documents
+!documents/future_features_modularization.md
 env/
 venv/
 ENV/

@@ -717,6 +717,22 @@ def summarize_guided(
                 display.show_error_panel(PANEL_VALIDATION_ERROR, FILE_NOT_FOUND.format(path=file_path))
                 raise typer.Exit(1)
 
+            # Check file size for memory-efficient handling
+            file_size = path.stat().st_size
+            if file_size > CONFIG.max_memory_file_size:
+                mb_size = file_size // (1024 * 1024)
+                threshold_mb = CONFIG.max_memory_file_size // (1024 * 1024)
+                display.show_panel(
+                    "Large File Warning",
+                    f"This file is {mb_size} MB, which exceeds the memory-efficient threshold ({threshold_mb} MB). "
+                    "Parsing will use streaming mode to conserve memory, but processing may be slower. Continue?",
+                    style="yellow",
+                    border_style="yellow"
+                )
+                if not typer.confirm("Continue with processing?", default=True):
+                    display.show_panel("Cancelled", "Operation cancelled by user.", style="red", border_style="red")
+                    raise typer.Exit(0)
+
             # Parse the document with progress
             document, extracted_text = _parse_with_progress(file_path, verbose=True)
 
