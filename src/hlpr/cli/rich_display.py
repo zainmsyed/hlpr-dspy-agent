@@ -33,6 +33,10 @@ class RichDisplay:
 
     def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console()
+        # Expose an instance of ProgressTracker for short-lived operations.
+        # Tests import and assert on this attribute to simulate progress
+        # advancement during the operation_progress context manager.
+        self._progress_tracker = ProgressTracker(console=console)
 
     def show_panel(
         self,
@@ -61,6 +65,37 @@ class RichDisplay:
     def show_error_panel(self, title: str, error_msg: str) -> None:
         """Convenience helper to display an error panel using red styles."""
         self.show_panel(title, error_msg, style="red", border_style="red")
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def operation_progress(
+        self, title: str, *, total: int, success_message: str = "Done"
+    ):
+        """Context manager that starts a progress for an operation, yields
+        control to the caller so they can advance progress via
+        `self._progress_tracker.advance()`, and displays a success panel
+        when the context exits cleanly or an error panel if an exception
+        occurred.
+
+        The context starts the internal ProgressTracker with the provided
+        total and description derived from `title`.
+        """
+        # Start the underlying tracker for the duration of the context
+        self._progress_tracker.reset()
+        self._progress_tracker.start(total=total, description=title)
+        try:
+            yield
+        except Exception as exc:
+            # Ensure progress is stopped and show an error panel with the
+            # exception message so the user receives actionable feedback.
+            self._progress_tracker.stop()
+            self.show_error_panel(title, str(exc))
+            raise
+        else:
+            # Stop the progress and display success panel
+            self._progress_tracker.stop()
+            self.show_panel(title, success_message, style="green", border_style="green")
 
 
 class ProgressTracker:

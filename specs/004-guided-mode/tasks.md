@@ -136,14 +136,14 @@ Single project structure (existing hlpr codebase):
 - [x] T049 [P] Add user preferences persistence in src/hlpr/models/user_preferences.py
 - [x] T050 [P] Implement template management CLI commands in src/hlpr/cli/template_commands.py
 - [ ] T051 [P] Add interactive file picker/browser in src/hlpr/cli/file_picker.py
- - [x] T051 [P] Add interactive file picker/browser in src/hlpr/cli/file_picker.py (implemented)
+ - [x] T051 [P] Add interactive file picker/browser in src/hlpr/cli/file_picker.py (postponed)
    
  Usage: The interactive file picker has been removed for now. Re-add when ready.
-- [ ] T052 [P] Implement configuration reset functionality in src/hlpr/cli/config_commands.py
+- [x] T052 [P] Implement configuration reset functionality in src/hlpr/cli/config_commands.py
 
 ### Performance & Scalability Improvements (Parallel Implementation)
-- [ ] T053 [P] Add async file operations for template saves in src/hlpr/models/saved_commands.py
-- [ ] T054 [P] Implement progress indicators for all operations in src/hlpr/cli/rich_display.py
+- [x] T053 [P] Add async file operations for template saves in src/hlpr/models/saved_commands.py
+- [x] T054 [P] Implement progress indicators for all operations in src/hlpr/cli/rich_display.py  # Completed: added RichDisplay.operation_progress context manager and unit tests
 - [ ] T055 [P] Add memory-efficient document handling for guided mode
 - [ ] T056 [P] Create batch processing support for guided workflow in src/hlpr/cli/batch_guided.py
 
@@ -316,4 +316,3 @@ Task: "Security tests for input validation in tests/security/test_input_validati
 **Enhancement Implementation**: Ready for execution (T040-T068)  
 **Estimated Enhancement Time**: 8-12 hours with parallel execution  
 **Priority**: High-priority code review recommendations integrated as tasks T040-T060
-````
