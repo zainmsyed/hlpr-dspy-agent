@@ -1,5 +1,5 @@
-from rich.console import Console
 import pytest
+from rich.console import Console
 
 from hlpr.cli.rich_display import RichDisplay
 
@@ -24,10 +24,11 @@ def test_operation_progress_exception_shows_error_panel():
     console = Console(record=True)
     rd = RichDisplay(console=console)
 
-    with pytest.raises(RuntimeError):
-        with rd.operation_progress("FailingOp", total=1, success_message="Should not see"):
-            # simulate an error inside the context
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), rd.operation_progress(
+        "FailingOp", total=1, success_message="Should not see"
+    ):
+        # simulate an error inside the context
+        raise RuntimeError("boom")
 
     output = console.export_text()
     assert "FailingOp" in output

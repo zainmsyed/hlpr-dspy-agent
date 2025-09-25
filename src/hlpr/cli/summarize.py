@@ -138,6 +138,17 @@ def summarize_document(
         console.print(f"[red]Error:[/red] {NOT_A_FILE.format(path=file_path)}")
         raise typer.Exit(1)
 
+    # Early check for unsupported formats to preserve legacy exit codes
+    extension = path.suffix.lower().lstrip(".")
+    try:
+        from hlpr.models.document import FileFormat
+
+        _ = FileFormat(extension)
+    except ValueError:
+        # Unsupported extension -> exit code 2 per contract tests
+        console.print(f"[red]Error:[/red] Unsupported file format: {extension}")
+        raise typer.Exit(2) from None
+
     try:
         log_ctx = new_context()
         start_extra = {"provider": provider}
@@ -201,6 +212,11 @@ def summarize_document(
     except HlprError as he:
         # Map domain errors to CLI exit codes for clearer automation handling
         if isinstance(he, DocumentProcessingError):
+            # Keep backwards-compatible mapping for unsupported formats
+            msg = str(he.message or "").lower()
+            if "unsupported" in msg:
+                console.print(f"[red]Document error:[/red] {he}")
+                raise typer.Exit(2) from he
             console.print(f"[red]Document error:[/red] {he}")
             raise typer.Exit(6) from he
         if isinstance(he, SummarizationError):
@@ -421,7 +437,7 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
     return content
 
 
-def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
+def _parse_with_progress(file_path: str, _verbose: bool) -> tuple[Document, str]:
     """Parse the document file with a progress indicator and return model+text."""
     with Progress(
         SpinnerColumn(),
@@ -484,7 +500,7 @@ def _summarize_with_progress(
     chunk_size: int,
     chunk_overlap: int,
     chunking_strategy: str,
-    verbose: bool,
+    _verbose: bool,
 ):
     """Generate summary with a progress indicator, using chunking when needed."""
     with Progress(

@@ -8,7 +8,11 @@ from hlpr.models.saved_commands import SavedCommands
 def test_template_save_and_list(tmp_path, monkeypatch):
     # ensure store uses a tmp path
     storage = tmp_path / "saved_commands.json"
-    monkeypatch.setattr(SavedCommands, "__init__", lambda self, path=None: setattr(self, "storage_path", storage) or None)
+    def _init_stub(self, path=None):
+        # attach storage_path attribute for tests; ignore provided path
+        self.storage_path = storage
+
+    monkeypatch.setattr(SavedCommands, "__init__", _init_stub)
     runner = CliRunner()
 
     # Save a template

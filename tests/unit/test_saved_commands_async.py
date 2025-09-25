@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 
 from hlpr.models.saved_commands import SavedCommands
 from hlpr.models.templates import CommandTemplate

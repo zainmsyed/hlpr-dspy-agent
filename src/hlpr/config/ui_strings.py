@@ -7,6 +7,29 @@ translate or test.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
+
+
+@dataclass
+class UIStringKeys:
+    VALIDATION_EMPTY_PATH: str = "validation.empty_path"
+    VALIDATION_FILE_NOT_FOUND: str = "validation.file_not_found"
+
+
+class UIStringManager:
+    def __init__(self, strings: dict[str, str]):
+        # Require at least one key to detect misuse; raise if empty to match
+        # contract tests which expect a ValueError for empty dicts.
+        if not strings:
+            raise ValueError("strings cannot be empty")
+        self._strings = strings
+
+    def get(self, key: str, **kwargs) -> str:
+        template = self._strings.get(key)
+        if template is None:
+            raise KeyError(f"Missing UI string for key: {key}")
+        return template.format(**kwargs)
+
 
 # Validation / file messages
 EMPTY_PATH_MSG = "Empty path: provide a valid file path (e.g. /home/user/doc.md)"

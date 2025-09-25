@@ -66,11 +66,14 @@ class DocumentParser:
             file_format = FileFormat(extension)
         except ValueError:
             allowed = ",".join([f.name.lower() for f in FileFormat])
-            msg = FORMAT_UNSUPPORTED_TEMPLATE.format(ofmt=extension, allowed=allowed)
+            # FORMAT_UNSUPPORTED_TEMPLATE expects '{fmt}' as the placeholder
+            msg = FORMAT_UNSUPPORTED_TEMPLATE.format(fmt=extension, allowed=allowed)
             # Raise domain-specific error for unsupported format
+            # Tests expect the message to include 'Unsupported file format'
+            combined = f"Unsupported file format: {msg}"
             raise (
                 DocumentProcessingError(
-                    message=msg,
+                    message=combined,
                     details={"extension": extension},
                 )
             ) from None
