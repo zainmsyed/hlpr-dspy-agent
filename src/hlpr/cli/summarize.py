@@ -427,7 +427,7 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
-        disable=not verbose,
+        disable=False,  # Always show progress for better user feedback
     ) as progress:
         parse_task = progress.add_task("Parsing document...", total=None)
         try:
@@ -491,7 +491,7 @@ def _summarize_with_progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
-        disable=not verbose,
+        disable=False,  # Always show progress for better user feedback
     ) as progress:
         summarize_task = progress.add_task("Generating summary...", total=None)
         try:
@@ -718,7 +718,7 @@ def summarize_guided(
                 raise typer.Exit(1)
 
             # Parse the document with progress
-            document, extracted_text = _parse_with_progress(file_path, verbose=False)
+            document, extracted_text = _parse_with_progress(file_path, verbose=True)
 
             # Build summarizer using options collected
             timeout_val = CONFIG.default_timeout
@@ -737,7 +737,7 @@ def summarize_guided(
                 opts_dict.get("chunk_size", 8192),
                 opts_dict.get("chunk_overlap", 256),
                 opts_dict.get("chunking_strategy", "sentence"),
-                verbose=False,
+                verbose=True,
             )
 
             # Display summary using requested format
