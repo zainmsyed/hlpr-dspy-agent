@@ -17,9 +17,9 @@ from hlpr.cli.renderers import (
     PlainTextRenderer,
     RichRenderer,
 )
+from hlpr.config import PLATFORM_DEFAULTS, get_env_provider
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
-from hlpr.config import PLATFORM_DEFAULTS, get_env_provider
 from hlpr.exceptions import HlprError
 from hlpr.models.document import Document
 

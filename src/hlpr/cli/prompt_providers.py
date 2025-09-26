@@ -17,7 +17,7 @@ from rich.console import Console
 
 from hlpr.cli.help_display import HelpDisplay
 from hlpr.cli.prompts import OptionPrompts
-from hlpr.config import PLATFORM_DEFAULTS, get_env_provider, get_env_format
+from hlpr.config import PLATFORM_DEFAULTS, get_env_format, get_env_provider
 
 
 class PromptProvider(Protocol):

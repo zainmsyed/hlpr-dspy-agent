@@ -5,8 +5,8 @@ from typing import NoReturn
 import typer
 from rich.console import Console
 
-from hlpr.models.user_preferences import PreferencesStore, UserPreferences
 from hlpr.config import PLATFORM_DEFAULTS
+from hlpr.models.user_preferences import PreferencesStore, UserPreferences
 
 app = typer.Typer(help="Configuration commands")
 console = Console()

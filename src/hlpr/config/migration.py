@@ -7,7 +7,8 @@ can be registered as needed.
 """
 from __future__ import annotations
 
-from typing import Callable, Dict, Any
+from collections.abc import Callable
+from typing import Any
 
 CURRENT_SCHEMA_VERSION = 1
 
@@ -17,7 +18,7 @@ class MigrationError(RuntimeError):
 
 
 # Each migration is a function that accepts and returns a dict
-Migration = Callable[[Dict[str, Any]], Dict[str, Any]]
+Migration = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 _MIGRATIONS: dict[int, Migration] = {}
@@ -31,14 +32,24 @@ def register_migration(version: int):
     return _decorator
 
 
-def migrate(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Migrate `config` in-place (returns a new dict) to CURRENT_SCHEMA_VERSION.
+def migrate(config: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a configuration dict to the current schema version.
 
-    Expects optional top-level key "schema_version". If absent, assumes 0.
-    """
+        Contract:
+        - Reads optional top-level key `schema_version`; if absent, assumes 0.
+        - Applies sequential registered migrations up to CURRENT_SCHEMA_VERSION.
+        - Returns a new dict; does not mutate the input in place.
+
+        Raises:
+        - MigrationError: if the config is from a newer schema version or if a
+            required migration step is missing.
+        """
     version = int(config.get("schema_version", 0))
     if version > CURRENT_SCHEMA_VERSION:
-        raise MigrationError(f"Config schema version {version} is newer than supported {CURRENT_SCHEMA_VERSION}")
+        raise MigrationError(
+            f"Config schema version {version} is newer than supported "
+            f"{CURRENT_SCHEMA_VERSION}"
+        )
 
     data = dict(config)
     while version < CURRENT_SCHEMA_VERSION:
@@ -55,7 +66,7 @@ def migrate(config: Dict[str, Any]) -> Dict[str, Any]:
 
 # Example migration: bring old 'default_provider' top-level key to 'provider'
 @register_migration(1)
-def _migrate_0_to_1(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def _migrate_0_to_1(cfg: dict[str, Any]) -> dict[str, Any]:
     out = dict(cfg)
     # rename legacy 'default_provider' -> 'provider'
     if "default_provider" in out and "provider" not in out:

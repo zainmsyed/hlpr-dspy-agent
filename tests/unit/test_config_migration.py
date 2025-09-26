@@ -1,4 +1,4 @@
-from hlpr.config.migration import migrate, MigrationError, CURRENT_SCHEMA_VERSION
+from hlpr.config.migration import CURRENT_SCHEMA_VERSION, MigrationError, migrate
 
 
 def test_migrate_legacy_keys():

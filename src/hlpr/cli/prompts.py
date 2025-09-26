@@ -8,13 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from hlpr.config import PLATFORM_DEFAULTS, get_env_format, get_env_provider
 from hlpr.config.guided import (
     ALLOWED_FORMATS,
     ALLOWED_PROVIDERS,
-    DEFAULT_CHUNK_SIZE,
     MAX_PROMPT_ATTEMPTS,
 )
-from hlpr.config import PLATFORM_DEFAULTS, get_env_provider, get_env_format
 from hlpr.config.ui_strings import (
     FORMAT_EMPTY_MSG,
     FORMAT_UNSUPPORTED_TEMPLATE,

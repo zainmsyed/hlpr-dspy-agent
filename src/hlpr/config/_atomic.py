@@ -12,13 +12,18 @@ from pathlib import Path
 
 
 def atomic_write(path: Path, data: str, mode: int = 0o600) -> None:
-    """Atomically write `data` to `path`.
+    """Atomically write `data` to `path` with secure permissions.
 
-    - Writes to a temp file in the same directory.
-    - Flushes and fsyncs the file descriptor where possible.
-    - Replaces the target with os.replace for atomic swap.
-    - Attempts to fsync the containing directory.
-    - Sets file permissions to `mode` where possible.
+    Behavior:
+    - Writes to a same-directory temporary file and fsyncs it (best-effort).
+    - Atomically replaces the target via os.replace.
+    - Attempts to fsync the containing directory (best-effort).
+    - Applies file permissions to `mode` (default 0o600; best-effort).
+
+    Args:
+        path: Destination file path.
+        data: String content to write.
+        mode: Octal permission bits to apply to the final file.
     """
     dirpath = str(path.parent)
     os.makedirs(dirpath, exist_ok=True)
@@ -27,26 +32,20 @@ def atomic_write(path: Path, data: str, mode: int = 0o600) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(data)
             fh.flush()
-            try:
+            with contextlib.suppress(OSError, AttributeError):
                 os.fsync(fh.fileno())
-            except (OSError, AttributeError):
-                pass
 
         os.replace(tmp_path, str(path))
 
-        try:
+        with contextlib.suppress(OSError, AttributeError):
             dir_fd = os.open(dirpath, os.O_RDONLY)
             try:
                 os.fsync(dir_fd)
             finally:
                 os.close(dir_fd)
-        except (OSError, AttributeError):
-            pass
 
-        try:
+        with contextlib.suppress(OSError):
             os.chmod(path, mode)
-        except OSError:
-            pass
     finally:
         if os.path.exists(tmp_path):
             with contextlib.suppress(OSError):

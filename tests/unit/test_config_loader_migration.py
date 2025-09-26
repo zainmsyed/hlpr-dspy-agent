@@ -1,6 +1,4 @@
 import json
-import tempfile
-from pathlib import Path
 
 from hlpr.config.loader import ConfigLoader
 

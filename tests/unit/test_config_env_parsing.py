@@ -1,7 +1,4 @@
-import os
 from pathlib import Path
-
-import pytest
 
 from hlpr.config.loader import ConfigLoader
 
@@ -19,7 +16,7 @@ def test_nested_env_keys_and_json_values(monkeypatch):
     monkeypatch.delenv("HLPR_CONFIG_PATH", raising=False)
     monkeypatch.setenv("HLPR_LOG__LEVEL", "info")
     monkeypatch.setenv("HLPR_FLAG", "true")
-    monkeypatch.setenv("HLPR_JSON_LIST", "[\"a\", \"b\"]")
+    monkeypatch.setenv("HLPR_JSON_LIST", '["a", "b"]')
     monkeypatch.setenv("HLPR_CHUNK_SIZE", "2048")
 
     loader = ConfigLoader()

@@ -9,13 +9,11 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import stat
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .platform import PlatformConfig
 from ._atomic import atomic_write
+from .platform import PlatformConfig
 
 
 @dataclass
@@ -36,6 +34,14 @@ class ConfigRecovery:
     """
 
     def __init__(self, config_path: Path, backup_path: Path, logger=None):
+        """Create a new recovery helper.
+
+        Args:
+            config_path: Path to the primary config file.
+            backup_path: Path to the backup config file.
+            logger: Optional logger for diagnostic messages; errors are
+                suppressed if logging fails.
+        """
         self.config_path = config_path
         self.backup_path = backup_path
         self.logger = logger
@@ -89,20 +95,18 @@ class ConfigRecovery:
             os.makedirs(os.path.dirname(self.backup_path), exist_ok=True)
             # Use an alternate name if backup exists to avoid overwriting
             if self.backup_path.exists():
-                alt = self.backup_path.with_suffix(self.backup_path.suffix + ".corrupt")
+                alt = self.backup_path.with_suffix(
+                    self.backup_path.suffix + ".corrupt"
+                )
                 os.replace(str(self.config_path), str(alt))
                 # Make preserved file read-only for safety where possible
-                try:
+                with contextlib.suppress(OSError):
                     os.chmod(alt, 0o400)
-                except OSError:
-                    pass
                 return str(alt)
 
             os.replace(str(self.config_path), str(self.backup_path))
-            try:
+            with contextlib.suppress(OSError):
                 os.chmod(self.backup_path, 0o400)
-            except OSError:
-                pass
             return str(self.backup_path)
         except OSError as e:
             if self.logger:
@@ -113,6 +117,16 @@ class ConfigRecovery:
             return None
 
     def recover_config(self) -> RecoveryResult:
+        """Recover the configuration file when corruption is detected.
+
+        Strategy:
+        1) If the config is valid JSON, do nothing and report success.
+        2) If a valid backup exists, atomically restore it.
+        3) Otherwise, preserve the corrupted file and write platform defaults.
+
+        Returns:
+            RecoveryResult: indicates outcome and action taken.
+        """
         preserved: str | None = None
 
         try:

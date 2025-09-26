@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
 
 from hlpr.config._atomic import atomic_write
+from hlpr.io.atomic import atomic_write_text
 
 
 def test_atomic_write_creates_file_and_writes(tmp_path):
@@ -22,10 +22,7 @@ def test_atomic_write_sets_permissions(tmp_path):
 
     # Permission check is best-effort; ensure file exists and readable
     assert target.exists()
-    assert "{\"b\": 2}" in target.read_text(encoding="utf-8")
-import json
-
-from hlpr.io.atomic import atomic_write_text
+    assert '{"b": 2}' in target.read_text(encoding="utf-8")
 
 
 def test_atomic_write_text(tmp_path):

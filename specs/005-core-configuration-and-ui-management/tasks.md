@@ -107,8 +107,8 @@ Integration tests: T012-T019 were executed; all passed with one test skipped (pl
 ## Phase 3.5: Polish
 
 ### Performance and Validation
-- [ ] T035 [P] Unit tests for edge cases in tests/unit/test_config_edge_cases.py
-- [ ] T036 [P] Performance benchmarks (<100ms loading, <10ms validation) in tests/unit/test_config_performance.py
+- [x] T035 [P] Unit tests for edge cases in tests/unit/test_config_edge_cases.py
+- [x] T036 [P] Performance benchmarks (<100ms loading, <10ms validation) in tests/unit/test_config_performance.py
 
 ## Dependencies
 - Setup (T001-T003) before all other phases

@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from hlpr.config.migration import migrate as _migrate_config
 from hlpr.config_helpers import _float_or_none, _parse_bounded_int
 
 
@@ -113,7 +114,13 @@ class PlatformDefaults:
 
     # Provider defaults
     default_provider: str = "local"
-    supported_providers: tuple[str, ...] = ("local", "openai", "anthropic", "groq", "together")
+    supported_providers: tuple[str, ...] = (
+        "local",
+        "openai",
+        "anthropic",
+        "groq",
+        "together",
+    )
 
     # Format defaults
     default_format: str = "rich"
@@ -152,10 +159,6 @@ def get_env_format(default: str | None = None) -> str:
     """
     fmt = os.getenv("HLPR_DEFAULT_FORMAT") or os.getenv("HLPR_FORMAT")
     return fmt if fmt else (default or PLATFORM_DEFAULTS.default_format)
-
-
-# Migration helper (lightweight wrapper)
-from hlpr.config.migration import migrate as _migrate_config, MigrationError
 
 
 def migrate_config(config_dict: dict) -> dict:

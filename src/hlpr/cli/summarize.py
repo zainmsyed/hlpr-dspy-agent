@@ -30,7 +30,7 @@ from hlpr.cli.renderers import (
     RichRenderer,
 )
 from hlpr.cli.rich_display import RichDisplay
-from hlpr.config import CONFIG, PLATFORM_DEFAULTS, get_env_provider, get_env_format
+from hlpr.config import CONFIG, PLATFORM_DEFAULTS, get_env_format, get_env_provider
 from hlpr.config.ui_strings import (
     FILE_NOT_FOUND,
     NOT_A_FILE,

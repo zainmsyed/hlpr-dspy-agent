@@ -7,12 +7,16 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-ALLOWED_PROVIDERS: Sequence[str] = ("local", "openai", "anthropic", "groq", "together")
-ALLOWED_FORMATS: Sequence[str] = ("rich", "txt", "md", "json")
+from hlpr.config import PLATFORM_DEFAULTS
 
-DEFAULT_PROVIDER = "local"
-DEFAULT_FORMAT = "rich"
-DEFAULT_CHUNK_SIZE = 8192
+# Surface allowed values by referencing the centralized defaults so they stay in
+# sync with the rest of the codebase.
+ALLOWED_PROVIDERS: Sequence[str] = PLATFORM_DEFAULTS.supported_providers
+ALLOWED_FORMATS: Sequence[str] = PLATFORM_DEFAULTS.supported_formats
+
+DEFAULT_PROVIDER = PLATFORM_DEFAULTS.default_provider
+DEFAULT_FORMAT = PLATFORM_DEFAULTS.default_format
+DEFAULT_CHUNK_SIZE = PLATFORM_DEFAULTS.default_chunk_size
 MAX_PROMPT_ATTEMPTS = 3
 
 # Help text short summary; keep in sync with help_display DEFAULT_* dicts if used.
