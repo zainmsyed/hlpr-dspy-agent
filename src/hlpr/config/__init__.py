@@ -34,16 +34,40 @@ if os.path.exists(_legacy_path):
     sys.modules["hlpr._legacy_config"] = _mod
     if spec and spec.loader:
         spec.loader.exec_module(_mod)
-    # Re-export the commonly used names expected by the codebase
-    try:
-        CONFIG = _mod.CONFIG
-    except AttributeError:
-        CONFIG = None  # type: ignore[assignment]
+        # Re-export the commonly used names expected by the codebase
+        try:
+            CONFIG = _mod.CONFIG
+        except AttributeError:
+            CONFIG = None  # type: ignore[assignment]
 
-    try:
-        HlprConfig = _mod.HlprConfig
-    except AttributeError:
-        HlprConfig = None  # type: ignore[assignment]
+        try:
+            HlprConfig = _mod.HlprConfig
+        except AttributeError:
+            HlprConfig = None  # type: ignore[assignment]
+
+        # New exports introduced during refactor: PLATFORM_DEFAULTS and helpers
+        try:
+            PLATFORM_DEFAULTS = _mod.PLATFORM_DEFAULTS
+        except AttributeError:
+            PLATFORM_DEFAULTS = None  # type: ignore[assignment]
+
+        try:
+            get_env_provider = _mod.get_env_provider
+        except AttributeError:
+            def get_env_provider(default: str | None = None) -> str | None:  # type: ignore[misc]
+                return default
+
+        try:
+            get_env_format = _mod.get_env_format
+        except AttributeError:
+            def get_env_format(default: str | None = None) -> str | None:  # type: ignore[misc]
+                return default
+
+        try:
+            migrate_config = _mod.migrate_config
+        except AttributeError:
+            def migrate_config(cfg: dict) -> dict:  # type: ignore[misc]
+                return cfg
 else:
     # Fallbacks if the legacy module is missing: keep names defined to
     # avoid ImportError during startup; callers should detect None if

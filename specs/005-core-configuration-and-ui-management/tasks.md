@@ -84,15 +84,25 @@
 ## Phase 3.4: Integration
 
 ### File System Integration
-- [ ] T029 Cross-platform permission handling in ConfigRecovery
-- [ ] T030 Atomic configuration file operations in ConfigRecovery
-- [ ] T031 Environment variable processing in ConfigLoader
+- [x] T029 Cross-platform permission handling in ConfigRecovery
+- [x] T030 Atomic configuration file operations in ConfigRecovery
+- [x] T031 Environment variable processing in ConfigLoader
+
+Integration tests: T012-T019 were executed; all passed with one test skipped (platform/optional). See test logs for skipped-test details.
 
 ### Backward Compatibility
-- [ ] T032 Extend existing config.py with platform constants integration and new option compatibility
-- [ ] T033 Update CLI modules to use centralized constants (guided mode, batch processing)
-- [ ] T034 Migration helpers for existing configuration files with safe new option defaults
-- [ ] T037 Configuration schema version migration system in src/hlpr/config/migration.py
+- [x] T032 Extend existing config.py with platform constants integration and new option compatibility
+- [x] T033 Update CLI modules to use centralized constants (guided mode, batch processing)
+ - Implementation notes: CLI Typer options across `src/hlpr/cli/` were updated to
+   call `hlpr.config.get_env_provider(...)` and `hlpr.config.get_env_format(...)`,
+   and to use `hlpr.config.PLATFORM_DEFAULTS` instead of in-line literal defaults
+   (for example, replacing hard-coded "local" and "rich").
+ - Tests: Unit and integration tests were executed; the full test suite passed
+   locally (pytest run on 2025-09-26). `ConfigLoader.load_config()` now applies
+   `migrate_config()` to file-based configs before merging to ensure legacy keys
+   are transformed.
+- [x] T034 Migration helpers for existing configuration files with safe new option defaults
+- [x] T037 Configuration schema migration system in src/hlpr/config/migration.py
 
 ## Phase 3.5: Polish
 

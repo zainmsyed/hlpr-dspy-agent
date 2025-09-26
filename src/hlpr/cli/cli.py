@@ -19,6 +19,7 @@ from hlpr.cli.renderers import (
 )
 from hlpr.document.parser import DocumentParser
 from hlpr.document.summarizer import DocumentSummarizer
+from hlpr.config import PLATFORM_DEFAULTS, get_env_provider
 from hlpr.exceptions import HlprError
 from hlpr.models.document import Document
 
@@ -57,7 +58,7 @@ def summarize(
         """
 
         try:
-            summarizer = DocumentSummarizer(provider=provider or "local")
+            summarizer = DocumentSummarizer(provider=provider or get_env_provider(PLATFORM_DEFAULTS.default_provider))
         except Exception:
             summarizer = None
 

@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from hlpr.models.user_preferences import PreferencesStore, UserPreferences
+from hlpr.config import PLATFORM_DEFAULTS
 
 app = typer.Typer(help="Configuration commands")
 console = Console()
@@ -65,7 +66,7 @@ except Exception:
 
 
 _config = {
-    "default_llm": "local",
+    "default_llm": PLATFORM_DEFAULTS.default_provider,
     "providers": {},
 }
 

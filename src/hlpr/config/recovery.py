@@ -9,11 +9,13 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import stat
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from .platform import PlatformConfig
+from ._atomic import atomic_write
 
 
 @dataclass
@@ -47,19 +49,8 @@ class ConfigRecovery:
             return False
 
     def _atomic_write(self, path: Path, data: str) -> None:
-        # Write to a temporary file in the same directory and atomically replace
-        dirpath = os.path.dirname(path)
-        os.makedirs(dirpath, exist_ok=True)
-        fd, tmp_path = tempfile.mkstemp(dir=dirpath, prefix=".hlpr_tmp_")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(data)
-            os.replace(tmp_path, str(path))
-        finally:
-            # Best-effort cleanup without hiding unexpected errors
-            if os.path.exists(tmp_path):
-                with contextlib.suppress(OSError):
-                    os.remove(tmp_path)
+        # Delegate to shared atomic helper which handles fsync and chmod
+        atomic_write(path, data)
 
     def _restore_from_backup(self) -> RecoveryResult | None:
         """Attempt to restore the config file from a valid backup.
@@ -96,11 +87,22 @@ class ConfigRecovery:
             return None
         try:
             os.makedirs(os.path.dirname(self.backup_path), exist_ok=True)
+            # Use an alternate name if backup exists to avoid overwriting
             if self.backup_path.exists():
                 alt = self.backup_path.with_suffix(self.backup_path.suffix + ".corrupt")
                 os.replace(str(self.config_path), str(alt))
+                # Make preserved file read-only for safety where possible
+                try:
+                    os.chmod(alt, 0o400)
+                except OSError:
+                    pass
                 return str(alt)
+
             os.replace(str(self.config_path), str(self.backup_path))
+            try:
+                os.chmod(self.backup_path, 0o400)
+            except OSError:
+                pass
             return str(self.backup_path)
         except OSError as e:
             if self.logger:

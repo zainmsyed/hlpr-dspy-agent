@@ -6,13 +6,17 @@ with proper precedence handling (user config > environment > defaults).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .platform import PlatformConfig, ResolvedConfig
+from ..config import PLATFORM_DEFAULTS, get_env_provider, get_env_format, migrate_config
+from ._atomic import atomic_write
 
 
 @dataclass
@@ -33,7 +37,16 @@ class ConfigLoader:
         config_path: Path | None = None,
         defaults: PlatformConfig | None = None,
     ):
-        self.config_path = config_path or Path.home() / ".hlpr" / "config.json"
+        # Allow overriding via environment variable HLPR_CONFIG_PATH
+        env_path = os.environ.get("HLPR_CONFIG_PATH")
+        if env_path:
+            try:
+                p = Path(env_path).expanduser().resolve()
+            except Exception:
+                p = Path(env_path).expanduser()
+            self.config_path = p
+        else:
+            self.config_path = config_path or Path.home() / ".hlpr" / "config.json"
         # Allow injecting a PlatformConfig instance
         self.defaults = defaults or PlatformConfig.from_defaults()
 
@@ -69,46 +82,64 @@ class ConfigLoader:
             return float(v)
         except ValueError:
             pass
-        return v
+        # Try JSON decode for complex values
+        try:
+            import json
+
+            return json.loads(v)
+        except Exception:
+            return v
 
     def _load_from_env(self) -> dict[str, Any]:
         prefix = "HLPR_"
         config: dict[str, Any] = {}
         for k, v in os.environ.items():
             if k.startswith(prefix):
-                key = k[len(prefix):].lower()
-                config[key] = self._parse_env_value(v)
+                # Support nested keys using double underscore: HLPR_LOG__LEVEL -> {'log': {'level': ...}}
+                key = k[len(prefix):]
+                parts = [p.lower() for p in key.split("__") if p]
+                parsed = self._parse_env_value(v)
+                target = config
+                for part in parts[:-1]:
+                    if part not in target or not isinstance(target[part], dict):
+                        target[part] = {}
+                    target = target[part]
+                target[parts[-1]] = parsed
         return config
 
     def load_config(self) -> LoadResult:
         start = time.time()
         env_conf = self._load_from_env()
         file_conf = self._load_from_file()
+        # Apply schema migrations to user config files so legacy keys are
+        # transformed into the current schema before merging.
+        try:
+            file_conf = migrate_config(file_conf or {}) or {}
+        except Exception:
+            # If migration fails for any reason, fall back to the raw file
+            # contents to avoid crashing the loader; callers may use
+            # ConfigRecovery to detect corruption.
+            file_conf = file_conf or {}
         defaults = self.defaults.to_dict().get("defaults", {})
         # Precedence: env > file > defaults
         merged = {**defaults, **file_conf, **env_conf}
 
         # Normalize and provide safe fallbacks for missing values
         # Allow env/file to set either 'provider' or legacy 'default_provider'
-        provider = (
-            merged.get("provider")
-            or merged.get("default_provider")
-            or defaults.get("default_provider")
-            or "local"
-        )
-        output_format = (
-            merged.get("output_format")
-            or merged.get("format")
-            or defaults.get("output_format")
-            or defaults.get("format")
-            or "rich"
-        )
+        # Respect explicit environment variables first (HLPR_DEFAULT_PROVIDER/HLPR_PROVIDER)
+        # Prefer explicit environment variables (HLPR_DEFAULT_PROVIDER/HLPR_DEFAULT_FORMAT)
+        # but fall back to merged file values and platform defaults when not set.
+        provider_fallback = merged.get("provider") or merged.get("default_provider") or defaults.get("default_provider") or PLATFORM_DEFAULTS.default_provider
+        provider = get_env_provider(provider_fallback)
+
+        format_fallback = merged.get("output_format") or merged.get("format") or defaults.get("output_format") or defaults.get("format") or PLATFORM_DEFAULTS.default_format
+        output_format = get_env_format(format_fallback)
         try:
             chunk_size = int(
-                merged.get("chunk_size", defaults.get("chunk_size", 8192))
+                merged.get("chunk_size", defaults.get("chunk_size", PLATFORM_DEFAULTS.default_chunk_size))
             )
         except (TypeError, ValueError):
-            chunk_size = defaults.get("chunk_size", 8192)
+            chunk_size = defaults.get("chunk_size", PLATFORM_DEFAULTS.default_chunk_size)
 
         # Normalize to typed ResolvedConfig
         resolved = ResolvedConfig(**{
@@ -150,9 +181,8 @@ class ConfigLoader:
 
             os.makedirs(self.config_path.parent, exist_ok=True)
             import json
-
-            with open(self.config_path, "w", encoding="utf-8") as fh:
-                json.dump(merged, fh, ensure_ascii=False, indent=2)
+            data = json.dumps(merged, ensure_ascii=False, indent=2)
+            atomic_write(self.config_path, data)
             return True
         except OSError:
             return False

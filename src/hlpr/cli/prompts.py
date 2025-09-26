@@ -12,10 +12,9 @@ from hlpr.config.guided import (
     ALLOWED_FORMATS,
     ALLOWED_PROVIDERS,
     DEFAULT_CHUNK_SIZE,
-    DEFAULT_FORMAT,
-    DEFAULT_PROVIDER,
     MAX_PROMPT_ATTEMPTS,
 )
+from hlpr.config import PLATFORM_DEFAULTS, get_env_provider, get_env_format
 from hlpr.config.ui_strings import (
     FORMAT_EMPTY_MSG,
     FORMAT_UNSUPPORTED_TEMPLATE,
@@ -52,7 +51,12 @@ class OptionPrompts:
         Interactive prompt providers should implement retry loops using
         `validate_provider` when performing real user I/O.
         """
-        candidate = str(self.defaults.get("provider", DEFAULT_PROVIDER))
+        # Prefer explicit defaults passed in, then environment overrides,
+        # then centralized platform default. This keeps behavior backward
+        # compatible while allowing newer env var names to take effect.
+        candidate = str(
+            self.defaults.get("provider", get_env_provider(PLATFORM_DEFAULTS.default_provider))
+        )
         valid, _msg = self.validate_provider(candidate)
         if valid:
             return candidate
@@ -60,7 +64,7 @@ class OptionPrompts:
         # If a help display is available, show provider help to assist users
         if self.help:
             self.help.show_provider_help()
-        return "local"
+        return PLATFORM_DEFAULTS.default_provider
 
     def validate_provider(self, provider: str) -> tuple[bool, str]:
         """Validate provider and return (is_valid, message)."""
@@ -71,13 +75,15 @@ class OptionPrompts:
         return True, "ok"
 
     def format_prompt(self) -> str:
-        candidate = str(self.defaults.get("format", DEFAULT_FORMAT))
+        candidate = str(
+            self.defaults.get("format", get_env_format(PLATFORM_DEFAULTS.default_format))
+        )
         valid, _msg = self.validate_format(candidate)
         if valid:
             return candidate
         if self.help:
             self.help.show_format_help()
-        return "rich"
+        return PLATFORM_DEFAULTS.default_format
 
     def validate_format(self, fmt: str) -> tuple[bool, str]:
         """Validate output format and return (is_valid, message)."""
@@ -116,5 +122,7 @@ class OptionPrompts:
 
     def advanced_options_prompt(self) -> dict[str, Any]:
         return {
-            "chunk_size": int(self.defaults.get("chunk_size", DEFAULT_CHUNK_SIZE)),
+            "chunk_size": int(
+                self.defaults.get("chunk_size", PLATFORM_DEFAULTS.default_chunk_size)
+            ),
         }

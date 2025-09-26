@@ -7,6 +7,7 @@ import os
 from collections.abc import Iterable
 from pathlib import Path
 
+from hlpr.config import PLATFORM_DEFAULTS
 from hlpr.config.ui_strings import (
     ACCESS_COULD_NOT_BE_DETERMINED,
     FILE_NOT_FOUND,
@@ -91,13 +92,8 @@ def suggest_file_fixes(path: str) -> list[str]:
 def validate_config(
     options: dict[str, object],
     *,
-    allowed_providers: Iterable[str] = ("local", "openai", "anthropic"),
-    allowed_output_formats: Iterable[str] = (
-        "rich",
-        "txt",
-        "md",
-        "json",
-    ),
+    allowed_providers: Iterable[str] = tuple(PLATFORM_DEFAULTS.supported_providers),
+    allowed_output_formats: Iterable[str] = tuple(PLATFORM_DEFAULTS.supported_formats),
     required_keys: Iterable[str] = ("provider", "output_format"),
 ) -> tuple[bool, str]:
     """Validate a simple CLI config/options mapping.
@@ -149,9 +145,12 @@ def resolve_config_conflicts(options: dict[str, object]) -> tuple[dict[str, obje
 
     provider = resolved.get("provider")
     fmt = resolved.get("output_format")
-    if provider == "local" and fmt == "rich":
+    # Use PLATFORM_DEFAULTS to determine provider/format semantics
+    local_provider = PLATFORM_DEFAULTS.default_provider
+    rich_format = PLATFORM_DEFAULTS.default_format
+    if provider == local_provider and fmt == rich_format:
         # local provider might not support rich rendering in headless contexts
-        warnings.append("'local' provider may not support 'rich' output in headless environments; falling back to 'txt'")
+        warnings.append(f"'{local_provider}' provider may not support '{rich_format}' output in headless environments; falling back to 'txt'")
         resolved["output_format"] = "txt"
 
     # Normalize boolean flags that may be provided as strings

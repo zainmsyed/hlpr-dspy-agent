@@ -99,3 +99,70 @@ class HlprConfig:
 
 # Provide a module-level config instance for convenience
 CONFIG = HlprConfig.from_env()
+
+
+# New: Platform-level constants and small compatibility helpers
+@dataclass(frozen=True)
+class PlatformDefaults:
+    """Immutable platform constants. Kept minimal and backward-compatible.
+
+    These values are intended as a single source of truth for CLI modules that
+    need provider/format defaults or filesystem layout. Do not assume this
+    replaces the existing HlprConfig; both are provided for compatibility.
+    """
+
+    # Provider defaults
+    default_provider: str = "local"
+    supported_providers: tuple[str, ...] = ("local", "openai", "anthropic", "groq", "together")
+
+    # Format defaults
+    default_format: str = "rich"
+    supported_formats: tuple[str, ...] = ("rich", "txt", "md", "json")
+
+    # Chunk size limits
+    default_chunk_size: int = 8192
+    min_chunk_size: int = 1024
+    max_chunk_size: int = 32768
+
+    # File layout
+    config_dir_name: str = ".hlpr"
+    config_filename: str = "config.json"
+    backup_filename: str = "config.backup.json"
+
+
+# Expose a module-level instance for convenience
+PLATFORM_DEFAULTS = PlatformDefaults()
+
+
+def get_env_provider(default: str | None = None) -> str:
+    """Return configured provider from env with backward-compatible names.
+
+    Looks for HLPR_DEFAULT_PROVIDER then HLPR_PROVIDER as a fallback.
+    Falls back to the given `default` or PLATFORM_DEFAULTS.default_provider.
+    """
+    provider = os.getenv("HLPR_DEFAULT_PROVIDER") or os.getenv("HLPR_PROVIDER")
+    return provider if provider else (default or PLATFORM_DEFAULTS.default_provider)
+
+
+def get_env_format(default: str | None = None) -> str:
+    """Return configured output format from env with compatibility.
+
+    Looks for HLPR_DEFAULT_FORMAT then HLPR_FORMAT. Falls back to the
+    supplied default or PLATFORM_DEFAULTS.default_format.
+    """
+    fmt = os.getenv("HLPR_DEFAULT_FORMAT") or os.getenv("HLPR_FORMAT")
+    return fmt if fmt else (default or PLATFORM_DEFAULTS.default_format)
+
+
+# Migration helper (lightweight wrapper)
+from hlpr.config.migration import migrate as _migrate_config, MigrationError
+
+
+def migrate_config(config_dict: dict) -> dict:
+    """Migrate a config dictionary to the current schema version.
+
+    This delegates to the migration module; kept here for convenience so
+    callers may import from `hlpr.config` instead of the submodule.
+    """
+    return _migrate_config(config_dict)
+

@@ -5,6 +5,8 @@ from typing import NoReturn
 import typer
 from rich.console import Console
 
+from hlpr.config import PLATFORM_DEFAULTS
+
 app = typer.Typer(help="Manage AI providers")
 console = Console()
 
@@ -34,8 +36,8 @@ def add_provider(
     max_tokens: int | None = typer.Option(None, "--max-tokens"),
 ) -> None:
     """Add a provider."""
-    # Validate provider type
-    valid_types = {"openai", "anthropic", "groq", "together", "local"}
+    # Validate provider type using centralized platform defaults
+    valid_types = set(PLATFORM_DEFAULTS.supported_providers)
     if provider_type not in valid_types:
         console.print("Invalid provider type")
         raise typer.Exit(1)

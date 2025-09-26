@@ -17,6 +17,7 @@ from rich.console import Console
 
 from hlpr.cli.help_display import HelpDisplay
 from hlpr.cli.prompts import OptionPrompts
+from hlpr.config import PLATFORM_DEFAULTS, get_env_provider, get_env_format
 
 
 class PromptProvider(Protocol):
@@ -76,7 +77,7 @@ class InteractivePromptProvider:
         return res.strip() or default
 
     def provider_prompt(self) -> str:
-        default = str(self.defaults.get("provider", "local"))
+        default = str(self.defaults.get("provider", get_env_provider(PLATFORM_DEFAULTS.default_provider)))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
         for _ in range(max_attempts):
             candidate = self._input_with_default("Provider", default)
@@ -91,7 +92,7 @@ class InteractivePromptProvider:
         return default
 
     def format_prompt(self) -> str:
-        default = str(self.defaults.get("format", "rich"))
+        default = str(self.defaults.get("format", get_env_format(PLATFORM_DEFAULTS.default_format)))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
         for _ in range(max_attempts):
             candidate = self._input_with_default("Format", default)
@@ -127,7 +128,7 @@ class InteractivePromptProvider:
         return default
 
     def advanced_options_prompt(self) -> dict[str, Any]:
-        default = int(self.defaults.get("chunk_size", 8192))
+        default = int(self.defaults.get("chunk_size", PLATFORM_DEFAULTS.default_chunk_size))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
         for _ in range(max_attempts):
             chunk = self._input_with_default("Chunk size", str(default))
@@ -155,7 +156,7 @@ class RichTyperPromptProvider:
         self._help = self.defaults.get("help_display") or HelpDisplay(self.console)
 
     def provider_prompt(self) -> str:
-        default = str(self.defaults.get("provider", "local"))
+        default = str(self.defaults.get("provider", get_env_provider(PLATFORM_DEFAULTS.default_provider)))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
         for _ in range(max_attempts):
             candidate = typer.prompt("Provider", default=default)
@@ -168,7 +169,7 @@ class RichTyperPromptProvider:
         return default
 
     def format_prompt(self) -> str:
-        default = str(self.defaults.get("format", "rich"))
+        default = str(self.defaults.get("format", get_env_format(PLATFORM_DEFAULTS.default_format)))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
         for _ in range(max_attempts):
             candidate = typer.prompt("Output format", default=default)
@@ -203,7 +204,7 @@ class RichTyperPromptProvider:
         return default
 
     def advanced_options_prompt(self) -> dict[str, Any]:
-        default = int(self.defaults.get("chunk_size", 8192))
+        default = int(self.defaults.get("chunk_size", PLATFORM_DEFAULTS.default_chunk_size))
         max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
         for _ in range(max_attempts):
             chunk = typer.prompt("Chunk size", default=str(default))

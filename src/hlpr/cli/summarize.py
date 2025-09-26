@@ -30,7 +30,7 @@ from hlpr.cli.renderers import (
     RichRenderer,
 )
 from hlpr.cli.rich_display import RichDisplay
-from hlpr.config import CONFIG
+from hlpr.config import CONFIG, PLATFORM_DEFAULTS, get_env_provider, get_env_format
 from hlpr.config.ui_strings import (
     FILE_NOT_FOUND,
     NOT_A_FILE,
@@ -62,7 +62,7 @@ console = Console()
 def summarize_document(
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
     provider: str = typer.Option(
-        "local",
+        get_env_provider(PLATFORM_DEFAULTS.default_provider),
         "--provider",
         help=(
             "AI provider to use [local|openai|anthropic|groq|together]"
@@ -73,7 +73,7 @@ def summarize_document(
             help="Save summary to file",
         ),
     output_format: str = typer.Option(
-        "rich",
+        get_env_format(PLATFORM_DEFAULTS.default_format),
         "--format",
         help="Output format [txt|md|json|rich]",
     ),
@@ -83,7 +83,7 @@ def summarize_document(
         help="Output file path",
     ),
     chunk_size: int = typer.Option(
-        8192,
+        PLATFORM_DEFAULTS.default_chunk_size,
         "--chunk-size",
         help="Chunk size for large documents",
     ),
@@ -605,10 +605,10 @@ def _display_meeting_summary(
 @app.command("meeting")
 def summarize_meeting(
     file_path: str = typer.Argument(..., help="Path to meeting notes (txt|md)"),
-    output_format: str = typer.Option("rich", "--format", help="[txt|md|json|rich]"),
+    output_format: str = typer.Option(get_env_format(PLATFORM_DEFAULTS.default_format), "--format", help="[txt|md|json|rich]"),
     title: str | None = typer.Option(None, "--title", help="Optional meeting title"),
     date: str | None = typer.Option(None, "--date", help="Optional meeting date"),
-    provider: str = typer.Option("local", "--provider", help="AI provider to use"),
+    provider: str = typer.Option(get_env_provider(PLATFORM_DEFAULTS.default_provider), "--provider", help="AI provider to use"),
     *,
     save: bool = typer.Option(
         default=False,
@@ -690,8 +690,8 @@ def summarize_meeting(
 @app.command("guided")
 def summarize_guided(
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
-    provider: str = typer.Option("local", "--provider", help="AI provider to use"),
-    output_format: str = typer.Option("rich", "--format", help="Output format [txt|md|json|rich]"),
+    provider: str = typer.Option(get_env_provider(PLATFORM_DEFAULTS.default_provider), "--provider", help="AI provider to use"),
+    output_format: str = typer.Option(get_env_format(PLATFORM_DEFAULTS.default_format), "--format", help="Output format [txt|md|json|rich]"),
     simulate_work: bool = typer.Option(False, help="Simulate work during the guided flow"),
     execute: bool = typer.Option(True, "--execute/--no-execute", help="Run parse+summarization after prompts (default: interactive execute)"),
 ) -> None:
@@ -755,7 +755,7 @@ def summarize_guided(
             # Build summarizer using options collected
             timeout_val = CONFIG.default_timeout
             summarizer = DocumentSummarizer(
-                provider=opts_dict.get("provider", "local"),
+                provider=opts_dict.get("provider", get_env_provider(PLATFORM_DEFAULTS.default_provider)),
                 model=opts_dict.get("model", "gemma3:latest"),
                 temperature=opts_dict.get("temperature", 0.3),
                 timeout=timeout_val,
@@ -766,14 +766,14 @@ def summarize_guided(
                 summarizer,
                 document,
                 extracted_text,
-                opts_dict.get("chunk_size", 8192),
+                opts_dict.get("chunk_size", PLATFORM_DEFAULTS.default_chunk_size),
                 opts_dict.get("chunk_overlap", 256),
                 opts_dict.get("chunking_strategy", "sentence"),
                 verbose=True,
             )
 
             # Display summary using requested format
-            _display_summary(document, result, opts_dict.get("output_format", "rich"))
+            _display_summary(document, result, opts_dict.get("output_format", get_env_format(PLATFORM_DEFAULTS.default_format)))
 
             # Persist command template for reproducibility (non-fatal)
             try:
@@ -838,7 +838,7 @@ def summarize_guided(
 @app.command("documents")
 def summarize_documents(
     files: list[str] = typer.Argument(..., help="Files to summarize"),
-    provider: str = typer.Option("local", "--provider", help="AI provider to use"),
+    provider: str = typer.Option(get_env_provider(PLATFORM_DEFAULTS.default_provider), "--provider", help="AI provider to use"),
     format: OutputFormat = typer.Option(OutputFormat.RICH, "--format", help="Output format"),
     concurrency: int = typer.Option(4, "--concurrency", help="Max concurrent workers"),
     partial_output: str | None = typer.Option(
@@ -879,7 +879,7 @@ def summarize_documents(
 
     def make_adapter(provider_name: str | None):
         try:
-            summarizer = DocumentSummarizer(provider=provider_name or "local")
+            summarizer = DocumentSummarizer(provider=provider_name or get_env_provider(PLATFORM_DEFAULTS.default_provider))
         except Exception:
             summarizer = None
 
@@ -935,7 +935,7 @@ def summarize_documents(
 
         return adapter
 
-    summarize_fn = make_adapter(provider)
+    summarize_fn = make_adapter(provider or get_env_provider(PLATFORM_DEFAULTS.default_provider))
 
     results = processor.process_files(selections, summarize_fn)
 

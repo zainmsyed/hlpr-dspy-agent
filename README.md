@@ -100,6 +100,12 @@ hlpr summarize document test_document.txt --save --output my_summary.json --form
 - For `provider=local`, the summarizer defaults to no timeout when not explicitly provided; pass `--dspy-timeout` if you want to enforce one. See `documents/local-dspy.md` for more details.
 - When piping to another process (e.g., `| jq ...`), prefer `--format json` to avoid ANSI sequences.
 
+## Migration and config defaults
+
+Configuration defaults and CLI defaults have been centralized in `hlpr.config`.
+See `MIGRATION.md` in the project root for a short migration guide and notes on
+environment variables (`HLPR_PROVIDER`, `HLPR_DEFAULT_PROVIDER`, `HLPR_FORMAT`).
+
 ## Troubleshooting
 
 - File not found: check the path or use an absolute path.
