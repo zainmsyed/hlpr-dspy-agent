@@ -1,3 +1,20 @@
+<!--
+Sync Impact Report - Constitution Amendment v1.0.0 → v1.1.0
+=============================================================
+Version Change: v1.0.0 → v1.1.0 (MINOR - New principle added)
+Date: 2025-09-28
+
+ADDED SECTIONS:
+- Principle VI: DRY (Don't Repeat Yourself) Code Practice - NEW principle enforcing code deduplication
+
+TEMPLATES STATUS:
+- ✅ .specify/templates/plan-template.md - Already aligned (references constitution checks)
+- ✅ .specify/templates/spec-template.md - Already aligned (no code specifics)  
+- ✅ .specify/templates/tasks-template.md - Already aligned (includes T022 Remove duplication task)
+
+FOLLOW-UP TODOs: None - all templates already support the DRY principle
+-->
+
 # hlpr AI Assistant Constitution
 
 ## Core Principles
@@ -42,6 +59,15 @@ Enforce modern Python development practices:
 - **Type Hints** - Pydantic models for configuration and data validation
 - **Structured Logging** - Clear, debuggable output for troubleshooting
 - **Minimal Dependencies** - Keep core footprint small and focused
+
+### VI. DRY (Don't Repeat Yourself) Code Practice (NON-NEGOTIABLE)
+Eliminate code duplication systematically and proactively:
+- **Zero Tolerance for Duplication** - Any code pattern repeated more than twice must be extracted
+- **Shared Utilities** - Common functionality centralized in reusable modules
+- **Configuration Consolidation** - Default values and settings managed in single locations
+- **Template Abstraction** - Repetitive code patterns extracted into templates or base classes
+- **Refactoring Priority** - Regular identification and elimination of duplicate code blocks
+- **Measurement** - Track and reduce duplicate code metrics in each feature development cycle
 
 ## Technology Stack Requirements
 
@@ -110,4 +136,4 @@ This constitution supersedes all other development practices and decisions. All 
 - **Manual Review**: Architecture decisions reviewed against modular design principles
 - **Performance**: Local LLM timeout policies and DSPy optimization effectiveness monitored
 
-**Version**: 1.0.0 | **Ratified**: 2025-09-18 | **Last Amended**: 2025-09-18
+**Version**: 1.1.0 | **Ratified**: 2025-09-18 | **Last Amended**: 2025-09-28
