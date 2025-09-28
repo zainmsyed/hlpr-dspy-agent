@@ -1,0 +1,250 @@
+# API Contract Specification: Enhanced Document Summarization
+
+## POST /summarize/document (Enhanced)
+
+**Summary**: Summarize document with organized storage options
+
+**Request Body** (multipart/form-data):
+```
+file: binary (required) - Document file to summarize
+provider_id: string (optional) - AI provider (default: local)
+save_format: string (optional) - Output format [txt|md|json] (default: md)
+organized_storage: boolean (optional) - Use organized folder structure (default: false)
+custom_output_path: string (optional) - Custom save location (bypasses organized storage)
+```
+
+**Request Body** (application/json):
+```json
+{
+  "text_content": "string (required) - Raw text to summarize",
+  "title": "string (optional) - Document title",
+  "provider_id": "string (optional) - AI provider",
+  "save_format": "string (optional) - Output format [txt|md|json]",
+  "organized_storage": "boolean (optional) - Use organized structure",
+  "custom_output_path": "string (optional) - Custom save location"
+}
+```
+
+**Response 200 - Success** (Enhanced):
+```json
+{
+  "id": "string - Unique summary identifier",
+  "summary": "string - Generated summary text",
+  "key_points": ["string"] - Extracted key points",
+  "word_count": "integer - Original document word count",
+  "processing_time_ms": "integer - Processing duration",
+  "provider_used": "string - AI provider that generated summary",
+  "format": "string - Response format",
+  "storage_info": {
+    "saved": "boolean - Whether summary was saved to file",
+    "file_path": "string - Path where summary was saved (if saved)",
+    "used_organized_structure": "boolean - Whether organized folder was used",
+    "created_directories": ["string"] - List of directories created during save
+  }
+}
+```
+
+**Response 400 - Bad Request**:
+```json
+{
+  "error": "Invalid request parameters",
+  "error_code": "INVALID_REQUEST",
+  "details": {
+    "field": "Description of validation error"
+  }
+}
+```
+
+**Response 403 - Storage Permission Error**:
+```json
+{
+  "error": "Cannot create or write to specified storage location",
+  "error_code": "STORAGE_PERMISSION_DENIED",
+  "details": {
+    "attempted_path": "Path that failed",
+    "reason": "Permission denied or disk full"
+  }
+}
+```
+
+**Response 422 - Processing Error**:
+```json
+{
+  "error": "Document processing failed",
+  "error_code": "PROCESSING_ERROR", 
+  "details": {
+    "stage": "parsing|summarization|storage",
+    "reason": "Specific error description"
+  }
+}
+```
+
+## File Storage Integration
+
+### Organized Storage Behavior
+When `organized_storage: true`:
+1. API creates `hlpr/summaries/documents/` relative to server working directory
+2. Files saved as `{title_or_id}_summary.{format}`
+3. Returns `storage_info` with created paths
+4. Creates directories with appropriate permissions
+
+### Custom Path Behavior  
+When `custom_output_path` provided:
+1. `organized_storage` parameter ignored
+2. File saved to exact specified path
+3. Parent directories created if missing
+4. Returns actual save location in `storage_info.file_path`
+
+### Error Scenarios
+- **Directory Creation Failed**: Returns 403 with specific path and reason
+- **File Write Failed**: Returns 403 with permission details
+- **Invalid Path**: Returns 400 with path validation error
+- **Disk Space**: Returns 403 with disk space error
+
+## OpenAPI Schema
+
+```yaml
+openapi: 3.0.3
+info:
+  title: hlpr Document Summarization API (Enhanced)
+  version: 0.2.0
+
+paths:
+  /summarize/document:
+    post:
+      summary: Summarize document with organized storage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file
+                provider_id:
+                  type: string
+                  enum: [local, openai, anthropic, groq, together]
+                  default: local
+                save_format:
+                  type: string
+                  enum: [txt, md, json]
+                  default: md
+                organized_storage:
+                  type: boolean
+                  default: false
+                  description: Use hlpr/summaries/documents/ structure
+                custom_output_path:
+                  type: string
+                  description: Custom file save location
+              required: [file]
+          application/json:
+            schema:
+              type: object
+              properties:
+                text_content:
+                  type: string
+                  description: Raw text content
+                title:
+                  type: string
+                  description: Document title
+                provider_id:
+                  type: string
+                  enum: [local, openai, anthropic, groq, together]
+                  default: local
+                save_format:
+                  type: string
+                  enum: [txt, md, json]
+                  default: md
+                organized_storage:
+                  type: boolean
+                  default: false
+                custom_output_path:
+                  type: string
+              required: [text_content]
+      responses:
+        '200':
+          description: Document summarized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnhancedDocumentSummaryResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    EnhancedDocumentSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        summary:
+          type: string
+        key_points:
+          type: array
+          items:
+            type: string
+        word_count:
+          type: integer
+        processing_time_ms:
+          type: integer
+        provider_used:
+          type: string
+        format:
+          type: string
+        storage_info:
+          type: object
+          properties:
+            saved:
+              type: boolean
+            file_path:
+              type: string  
+            used_organized_structure:
+              type: boolean
+            created_directories:
+              type: array
+              items:
+                type: string
+          required: [saved]
+      required: [id, summary, key_points, word_count, processing_time_ms, provider_used, format, storage_info]
+    
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        error_code:
+          type: string
+        details:
+          type: object
+      required: [error, error_code]
+```
+
+## Integration Requirements
+
+### Server-Side Storage
+- API server must have write permissions to working directory
+- Organized structure created relative to server's working directory  
+- File paths returned as absolute paths in responses
+- Concurrent request handling for directory creation
+
+### Client Integration
+- Clients can specify storage preferences per request
+- Storage info returned for client-side tracking
+- Error responses include actionable troubleshooting information
+- Backward compatibility with existing API clients
+
+### Security Considerations
+- Path traversal prevention for custom output paths
+- File permission validation before write operations
+- Input sanitization for file names and paths
+- Rate limiting for storage-intensive operations
+
+*API contract complete: Enhanced endpoints with organized storage capabilities*

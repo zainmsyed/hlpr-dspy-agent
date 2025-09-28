@@ -1,8 +1,8 @@
 
-# Implementation Plan: [FEATURE]
+# Implementation Plan: Save Document Summaries in Organized Folder Structure
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Branch**: `005-save-document-summaries` | **Date**: September 28, 2025 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/005-save-document-summaries/spec.md`
 
 ## Execution Flow (/plan command scope)
 ```
@@ -31,23 +31,37 @@
 - Phase 3-4: Implementation execution (manual or via tools)
 
 ## Summary
-[Extract from feature spec: primary requirement + technical approach from research]
+Implement organized folder structure for document summary storage. When users save summaries via `--save` flag, automatically create and use `hlpr/summaries/documents/` folder structure relative to current working directory. Maintain backward compatibility by respecting exact custom paths when `--output` is specified. Default file format changed to Markdown (.md).
 
 ## Technical Context
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: Python 3.11+  
+**Primary Dependencies**: typer, rich, pathlib, os (standard library modules)  
+**Storage**: File system operations (directory creation, file writing)  
+**Testing**: pytest with contract tests for CLI behavior  
+**Target Platform**: Cross-platform (Linux, macOS, Windows)
+**Project Type**: single - CLI application enhancement  
+**Performance Goals**: Instant folder creation, <100ms path resolution  
+**Constraints**: Must maintain backward compatibility with existing `--output` parameter  
+**Scale/Scope**: Individual user workflow enhancement, no concurrent access patterns
 
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+**Initial Check**:
+**Modular Architecture**: ✅ PASS - Enhances existing CLI module without adding new modules  
+**Privacy-First Design**: ✅ PASS - No network operations, purely local file system enhancement  
+**CLI-First Experience**: ✅ PASS - Improves CLI user experience with organized storage  
+**DSPy Integration**: ✅ PASS - No changes to AI workflows, storage enhancement only  
+**Modern Tooling**: ✅ PASS - Uses standard library, maintains UV/Ruff compliance  
+**DRY Code Practice**: ✅ PASS - Enhances existing `_save_summary()` function, no duplication
+
+**Post-Design Check**:
+**Modular Architecture**: ✅ PASS - New `organized_storage.py` utility module, clean separation  
+**Privacy-First Design**: ✅ PASS - All operations local file system, no data transmission  
+**CLI-First Experience**: ✅ PASS - Enhanced CLI with better UX, clear error messages  
+**DSPy Integration**: ✅ PASS - No modifications to AI pipelines or DSPy workflows  
+**Modern Tooling**: ✅ PASS - Pathlib usage, type hints, Pydantic models planned  
+**DRY Code Practice**: ✅ PASS - Centralized path resolution, reusable utilities
 
 ## Project Structure
 
@@ -63,50 +77,26 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
+src/hlpr/
 ├── cli/
-└── lib/
+│   └── summarize.py        # Enhanced _save_summary() and _determine_output_path()
+├── io/
+│   └── organized_storage.py # NEW: Folder creation and path resolution utilities
+└── models/
+    └── output_preferences.py # NEW: Enhanced output configuration
 
 tests/
 ├── contract/
+│   └── test_cli_summarize_document.py # Enhanced with folder structure tests
 ├── integration/
+│   └── test_organized_storage.py      # NEW: File system integration tests
 └── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+    ├── test_organized_storage.py      # NEW: Unit tests for storage utilities
+    └── test_output_preferences.py     # NEW: Unit tests for preferences model
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Single project enhancement - modifying existing CLI module and adding supporting utilities. Primary changes in `src/hlpr/cli/summarize.py` with new utility modules for organized storage functionality.
 
 ## Phase 0: Outline & Research
 1. **Extract unknowns from Technical Context** above:
@@ -168,17 +158,30 @@ directories captured above]
 **Task Generation Strategy**:
 - Load `.specify/templates/tasks-template.md` as base
 - Generate tasks from Phase 1 design docs (contracts, data model, quickstart)
-- Each contract → contract test task [P]
-- Each entity → model creation task [P] 
-- Each user story → integration test task
-- Implementation tasks to make tests pass
+- **Contract Tests**: CLI behavior with/without `--output`, organized structure creation [P]
+- **Utility Modules**: `organized_storage.py` for path resolution and directory creation [P]
+- **Model Extensions**: Enhanced `OutputPreferences` for organized storage config [P]
+- **CLI Enhancements**: Modified `_save_summary()` and `_determine_output_path()` functions
+- **Integration Tests**: File system operations, error handling scenarios
+- **Quickstart Validation**: End-to-end testing following quickstart.md steps
 
 **Ordering Strategy**:
-- TDD order: Tests before implementation 
-- Dependency order: Models before services before UI
-- Mark [P] for parallel execution (independent files)
+- **Phase 1**: Contract tests (TDD approach) - Define expected behavior
+- **Phase 2**: Utility modules - Core path resolution and directory creation
+- **Phase 3**: Model enhancements - Configuration and data structures  
+- **Phase 4**: CLI integration - Modify existing CLI functions
+- **Phase 5**: Error handling - Comprehensive error scenarios
+- **Phase 6**: Integration testing - End-to-end validation
+- Mark [P] for parallel execution where modules are independent
 
-**Estimated Output**: 25-30 numbered, ordered tasks in tasks.md
+**Estimated Output**: 15-20 numbered, ordered tasks in tasks.md
+
+**Key Implementation Areas**:
+1. **Path Resolution Logic**: `determine_output_path()` function enhancement
+2. **Directory Creation**: `ensure_summary_directories()` utility function
+3. **Error Handling**: Permission, disk space, and validation errors
+4. **CLI Integration**: Seamless integration with existing `--save` workflow
+5. **Backward Compatibility**: Preserve all existing behaviors exactly
 
 **IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
 
@@ -202,18 +205,18 @@ directories captured above]
 *This checklist is updated during execution flow*
 
 **Phase Status**:
-- [ ] Phase 0: Research complete (/plan command)
-- [ ] Phase 1: Design complete (/plan command)
-- [ ] Phase 2: Task planning complete (/plan command - describe approach only)
+- [x] Phase 0: Research complete (/plan command)
+- [x] Phase 1: Design complete (/plan command)
+- [x] Phase 2: Task planning approach described (/plan command)
 - [ ] Phase 3: Tasks generated (/tasks command)
 - [ ] Phase 4: Implementation complete
 - [ ] Phase 5: Validation passed
 
 **Gate Status**:
-- [ ] Initial Constitution Check: PASS
-- [ ] Post-Design Constitution Check: PASS
-- [ ] All NEEDS CLARIFICATION resolved
-- [ ] Complexity deviations documented
+- [x] Initial Constitution Check: PASS
+- [x] Post-Design Constitution Check: PASS
+- [x] All NEEDS CLARIFICATION resolved
+- [x] No complexity deviations needed
 
 ---
 *Based on Constitution v2.1.1 - See `/memory/constitution.md`*

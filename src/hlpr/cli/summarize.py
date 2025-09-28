@@ -349,6 +349,9 @@ def _save_summary(
     """Save the summary to a file."""
     save_path = _determine_output_path(document, output_format, output_path)
 
+    # Ensure parent directory exists
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Ensure we don't overwrite without warning
     if save_path.exists():
         warn_msg = f"Overwriting existing file: {save_path}"
@@ -372,12 +375,16 @@ def _determine_output_path(
     if output_path:
         return Path(output_path)
 
+    # Create hlpr/summaries/documents directory structure
+    summaries_dir = Path("hlpr/summaries/documents")
+    summaries_dir.mkdir(parents=True, exist_ok=True)
+
     doc_name = Path(document.path).stem
     if output_format == "json":
-        return Path(f"{doc_name}_summary.json")
+        return summaries_dir / f"{doc_name}_summary.json"
     if output_format == "md":
-        return Path(f"{doc_name}_summary.md")
-    return Path(f"{doc_name}_summary.txt")
+        return summaries_dir / f"{doc_name}_summary.md"
+    return summaries_dir / f"{doc_name}_summary.txt"
 
 
 def _format_summary_content(document: Document, result: Any, output_format: str) -> str:
