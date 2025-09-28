@@ -19,6 +19,7 @@ class HlprError(Exception):
     Use as a dataclass so subclasses can declare message/code/details
     without repeating serialization logic.
     """
+
     message: str | None = None
     code: str = "HLPR_ERROR"
     details: dict[str, Any] | None = None
@@ -58,6 +59,7 @@ class ValidationError(HlprError):
     Pydantic reports proper field errors. Use this ValidationError for
     higher-level checks where a domain-level validation error is clearer.
     """
+
     code: str = "VALIDATION_ERROR"
 
     def status_code(self) -> int:

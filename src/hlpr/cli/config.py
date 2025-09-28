@@ -19,11 +19,13 @@ def show_preferences() -> None:
     """Show stored user preferences."""
     store = PreferencesStore()
     prefs = store.load()
-    console.print_json(data={
-        "theme": prefs.theme,
-        "last_provider": prefs.last_provider,
-        "last_format": prefs.last_format,
-    })
+    console.print_json(
+        data={
+            "theme": prefs.theme,
+            "last_provider": prefs.last_provider,
+            "last_format": prefs.last_format,
+        }
+    )
     raise typer.Exit(0)
 
 

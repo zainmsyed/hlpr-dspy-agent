@@ -1,4 +1,3 @@
-
 import pytest
 
 from hlpr.document.summarizer import DocumentSummarizer

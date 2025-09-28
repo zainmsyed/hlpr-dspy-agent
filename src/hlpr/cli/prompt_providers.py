@@ -8,6 +8,7 @@ InteractiveSession will accept a PromptProvider via DI so the UI can be
 swapped for tests or an interactive runtime implementation that uses
 Rich/Typer later.
 """
+
 from __future__ import annotations
 
 from typing import Any, Protocol
@@ -77,7 +78,9 @@ class InteractivePromptProvider:
 
     def provider_prompt(self) -> str:
         default = str(self.defaults.get("provider", "local"))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             candidate = self._input_with_default("Provider", default)
             valid, msg = self._prompts.validate_provider(candidate)
@@ -92,7 +95,9 @@ class InteractivePromptProvider:
 
     def format_prompt(self) -> str:
         default = str(self.defaults.get("format", "rich"))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             candidate = self._input_with_default("Format", default)
             valid, msg = self._prompts.validate_format(candidate)
@@ -108,12 +113,16 @@ class InteractivePromptProvider:
         save = save_raw.lower() in ("y", "yes")
         path = None
         if save:
-            path = self._input_with_default("Output path", str(self.defaults.get("output_path", "output.txt")))
+            path = self._input_with_default(
+                "Output path", str(self.defaults.get("output_path", "output.txt"))
+            )
         return save, path
 
     def temperature_prompt(self) -> float:
         default = float(self.defaults.get("temperature", 0.3))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             raw = self._input_with_default("Temperature", str(default))
             valid, msg = self._prompts.validate_temperature(raw)
@@ -128,7 +137,9 @@ class InteractivePromptProvider:
 
     def advanced_options_prompt(self) -> dict[str, Any]:
         default = int(self.defaults.get("chunk_size", 8192))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             chunk = self._input_with_default("Chunk size", str(default))
             try:
@@ -156,7 +167,9 @@ class RichTyperPromptProvider:
 
     def provider_prompt(self) -> str:
         default = str(self.defaults.get("provider", "local"))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             candidate = typer.prompt("Provider", default=default)
             valid, msg = self._prompts.validate_provider(candidate)
@@ -164,12 +177,16 @@ class RichTyperPromptProvider:
                 return candidate
             self.console.print(f"[red]Invalid provider:[/red] {msg}")
             self._help.show_provider_help()
-        self.console.print(f"[yellow]Max attempts exceeded, using default provider:[/yellow] {default}")
+        self.console.print(
+            f"[yellow]Max attempts exceeded, using default provider:[/yellow] {default}"
+        )
         return default
 
     def format_prompt(self) -> str:
         default = str(self.defaults.get("format", "rich"))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             candidate = typer.prompt("Output format", default=default)
             valid, msg = self._prompts.validate_format(candidate)
@@ -177,19 +194,28 @@ class RichTyperPromptProvider:
                 return candidate
             self.console.print(f"[red]Invalid format:[/red] {msg}")
             self._help.show_format_help()
-        self.console.print(f"[yellow]Max attempts exceeded, using default format:[/yellow] {default}")
+        self.console.print(
+            f"[yellow]Max attempts exceeded, using default format:[/yellow] {default}"
+        )
         return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:
-        save = typer.confirm("Save output to file?", default=bool(self.defaults.get("save", False)))
+        save = typer.confirm(
+            "Save output to file?", default=bool(self.defaults.get("save", False))
+        )
         path = None
         if save:
-            path = typer.prompt("Output path", default=str(self.defaults.get("output_path", "output.txt")))
+            path = typer.prompt(
+                "Output path",
+                default=str(self.defaults.get("output_path", "output.txt")),
+            )
         return save, path
 
     def temperature_prompt(self) -> float:
         default = float(self.defaults.get("temperature", 0.3))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             raw = typer.prompt("Temperature", default=str(default))
             valid, msg = self._prompts.validate_temperature(raw)
@@ -199,12 +225,16 @@ class RichTyperPromptProvider:
                 except Exception:
                     return default
             self.console.print(f"[red]Invalid temperature:[/red] {msg}")
-        self.console.print(f"[yellow]Max attempts exceeded, using default temperature:[/yellow] {default}")
+        self.console.print(
+            f"[yellow]Max attempts exceeded, using default temperature:[/yellow] {default}"
+        )
         return default
 
     def advanced_options_prompt(self) -> dict[str, Any]:
         default = int(self.defaults.get("chunk_size", 8192))
-        max_attempts = int(self.defaults.get("max_attempts", self._prompts.max_attempts))
+        max_attempts = int(
+            self.defaults.get("max_attempts", self._prompts.max_attempts)
+        )
         for _ in range(max_attempts):
             chunk = typer.prompt("Chunk size", default=str(default))
             try:
@@ -214,5 +244,7 @@ class RichTyperPromptProvider:
                 return {"chunk_size": val}
             except Exception:
                 self.console.print("[red]Chunk size must be a positive integer[/red]")
-        self.console.print(f"[yellow]Max attempts exceeded, using default chunk size:[/yellow] {default}")
+        self.console.print(
+            f"[yellow]Max attempts exceeded, using default chunk size:[/yellow] {default}"
+        )
         return {"chunk_size": default}

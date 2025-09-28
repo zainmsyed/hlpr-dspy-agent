@@ -25,6 +25,7 @@ class TestCliConfigContract:
         assert result.exit_code == 0
         # Should be valid JSON
         import json
+
         try:
             config = json.loads(result.output)
             assert isinstance(config, dict)

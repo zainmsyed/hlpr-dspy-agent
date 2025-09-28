@@ -11,10 +11,16 @@ from hlpr.cli.models import FileSelection
 
 def test_batch_handles_keyboard_interrupt():
     console = Console()
-    options = BatchOptions(max_workers=2, console=console, save_partial_on_interrupt=True)
+    options = BatchOptions(
+        max_workers=2, console=console, save_partial_on_interrupt=True
+    )
     bp = BatchProcessor(options)
 
-    files = [FileSelection(path="a.txt"), FileSelection(path="b.txt"), FileSelection(path="c.txt")]
+    files = [
+        FileSelection(path="a.txt"),
+        FileSelection(path="b.txt"),
+        FileSelection(path="c.txt"),
+    ]
 
     # Summarize function: sleep for a short time to allow SIGINT to arrive
     def summarize_fn(file_sel):

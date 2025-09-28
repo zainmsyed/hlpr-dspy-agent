@@ -44,26 +44,33 @@ class Document(BaseModel):
     size_bytes: int = Field(..., description="File size in bytes")
     content_hash: str = Field(..., description="SHA256 hash of file content")
     extracted_text: str | None = Field(
-        default=None, description="Raw extracted text content",
+        default=None,
+        description="Raw extracted text content",
     )
     summary: str | None = Field(default=None, description="Generated summary")
     key_points: list[str] = Field(
-        default_factory=list, description="Extracted key points",
+        default_factory=list,
+        description="Extracted key points",
     )
     processing_time_ms: int | None = Field(
-        default=None, description="Processing time in milliseconds",
+        default=None,
+        description="Processing time in milliseconds",
     )
     state: ProcessingState = Field(
-        default=ProcessingState.NEW, description="Current processing state",
+        default=ProcessingState.NEW,
+        description="Current processing state",
     )
     error_message: str | None = Field(
-        default=None, description="Error message if processing failed",
+        default=None,
+        description="Error message if processing failed",
     )
     created_at: datetime = Field(
-        default_factory=datetime.now, description="Creation timestamp",
+        default_factory=datetime.now,
+        description="Creation timestamp",
     )
     updated_at: datetime = Field(
-        default_factory=datetime.now, description="Last update timestamp",
+        default_factory=datetime.now,
+        description="Last update timestamp",
     )
 
     @field_validator("path")

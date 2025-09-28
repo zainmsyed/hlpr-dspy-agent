@@ -3,6 +3,7 @@
 This module provides different output formatters for CLI results, supporting
 rich terminal output, JSON, Markdown, and plain text formats.
 """
+
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -212,7 +213,9 @@ class JsonRenderer(BaseRenderer):
             ]
         else:
             # We only support pydantic models or list-of-models here
-            raise NotImplementedError("JsonRenderer does not support raw dict input yet")
+            raise NotImplementedError(
+                "JsonRenderer does not support raw dict input yet"
+            )
 
         # Add metadata about the rendering
         output = {

@@ -50,8 +50,13 @@ def create_account(payload: dict[str, Any]) -> JSONResponse:
     host = payload.get("host")
 
     # Validate id format
-    if not acc_id or not isinstance(acc_id, str) or not re.match(
-        r"^[A-Za-z0-9_\-]+$", acc_id,
+    if (
+        not acc_id
+        or not isinstance(acc_id, str)
+        or not re.match(
+            r"^[A-Za-z0-9_\-]+$",
+            acc_id,
+        )
     ):
         return JSONResponse(
             status_code=400,

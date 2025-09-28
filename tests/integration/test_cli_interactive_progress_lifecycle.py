@@ -26,6 +26,7 @@ def test_progress_lifecycle_and_percentage(tmp_path):
     try:
         import hlpr.config.ui_strings as ui_strings
     except ImportError:
+
         class _Fallback:
             PROGRESS_WORKING = "Working"
 
@@ -35,6 +36,7 @@ def test_progress_lifecycle_and_percentage(tmp_path):
     try:
         import hlpr.config.ui_strings as ui_strings
     except ImportError:
+
         class _Fallback:
             PANEL_COMPLETE = "Complete"
 

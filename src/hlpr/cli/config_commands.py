@@ -5,6 +5,7 @@ project defaults. The implementation intentionally avoids touching global
 system state beyond a single config file under the user's home directory
 (`~/.hlpr/guided_config.json`) and supports an optional backup.
 """
+
 from __future__ import annotations
 
 import json
@@ -33,7 +34,11 @@ def config_path() -> Path:
 
 
 @app.command("reset")
-def reset_config(backup: bool = typer.Option(True, "--backup/--no-backup", help="Backup existing config before reset")) -> None:
+def reset_config(
+    backup: bool = typer.Option(
+        True, "--backup/--no-backup", help="Backup existing config before reset"
+    ),
+) -> None:
     """Reset the guided-mode config file to sane defaults.
 
     This writes `~/.hlpr/guided_config.json` with DEFAULTS. If a file already

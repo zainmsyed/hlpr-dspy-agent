@@ -1,5 +1,3 @@
-
-
 def test_guided_workflow_integration():
     """T008: Integration test for guided mode workflow.
 

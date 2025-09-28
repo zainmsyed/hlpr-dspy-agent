@@ -34,9 +34,13 @@ def test_collect_options_is_fast():
 
     # Basic collection should be nearly instant; threshold configurable via env
     threshold = float(os.environ.get("HLPR_PROMPT_THRESHOLD", "0.12"))
-    assert (mid - start) < threshold, f"collect_basic_options too slow: {(mid-start):.3f}s"
+    assert (mid - start) < threshold, (
+        f"collect_basic_options too slow: {(mid - start):.3f}s"
+    )
     # Advanced collection also should be quick
-    assert (end - mid) < threshold, f"collect_advanced_options too slow: {(end-mid):.3f}s"
+    assert (end - mid) < threshold, (
+        f"collect_advanced_options too slow: {(end - mid):.3f}s"
+    )
     # Sanity checks
     assert base.provider == "local"
     assert adv.chunk_size == 8192

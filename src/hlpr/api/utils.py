@@ -1,4 +1,5 @@
 """Small helpers for API serialization and sanitization."""
+
 from typing import Any
 
 

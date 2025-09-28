@@ -182,7 +182,8 @@ class DocumentSummarizer:
         logger.info("Falling back to deterministic summarizer")
         result = self._fallback_summarize(document.extracted_text)
         result.hallucinations = self._detect_hallucinations(
-            document.extracted_text, result.summary,
+            document.extracted_text,
+            result.summary,
         )
         if self.verify_hallucinations_flag and result.hallucinations:
             result.hallucination_verification = self.verify_hallucinations(
@@ -190,7 +191,6 @@ class DocumentSummarizer:
                 result.hallucinations,
             )
         return result
-
 
     def summarize_text(
         self,
@@ -229,17 +229,19 @@ class DocumentSummarizer:
             logger.exception(msg)
             result = self._fallback_summarize(text)
             result.hallucinations = self._detect_hallucinations(
-                text, result.summary,
+                text,
+                result.summary,
             )
             if self.verify_hallucinations_flag and result.hallucinations:
-                result.hallucination_verification = (
-                    self.verify_hallucinations(text, result.hallucinations)
+                result.hallucination_verification = self.verify_hallucinations(
+                    text, result.hallucinations
                 )
             return result
         else:
             summary_text = dspy_result.summary
             hallucinations = self._detect_hallucinations(
-                document_text, summary_text,
+                document_text,
+                summary_text,
             )
             result = SummaryResult(
                 summary=dspy_result.summary,
@@ -249,8 +251,8 @@ class DocumentSummarizer:
                 provider=getattr(dspy_result, "provider", None) or self.provider,
             )
             if self.verify_hallucinations_flag and hallucinations:
-                result.hallucination_verification = (
-                    self.verify_hallucinations(document_text, hallucinations)
+                result.hallucination_verification = self.verify_hallucinations(
+                    document_text, hallucinations
                 )
             return result
 
@@ -320,8 +322,7 @@ class DocumentSummarizer:
 
             # Combine chunk summaries into final summary
             combined_text = "\n\n".join(
-                f"Part {i + 1}: {summary}"
-                for i, summary in enumerate(chunk_summaries)
+                f"Part {i + 1}: {summary}" for i, summary in enumerate(chunk_summaries)
             )
 
             final_result = self.summarize_text(
@@ -356,9 +357,7 @@ class DocumentSummarizer:
         """
         # Simple sentence split by periods and newlines
         sentences = [
-            s.strip()
-            for s in text.replace("\n", " ").split(". ")
-            if s.strip()
+            s.strip() for s in text.replace("\n", " ").split(". ") if s.strip()
         ]
         summary = ". ".join(sentences[:2])
         if summary and not summary.endswith("."):
@@ -391,14 +390,13 @@ class DocumentSummarizer:
         best-effort — it won't block summarization on error.
         """
         try:
+
             def tokenize(s: str) -> set[str]:
                 return set(re.findall(r"\w+", s.lower()))
 
             source_tokens = tokenize(source_text)
             sentences = [
-                s.strip()
-                for s in re.split(r"(?<=[.!?])\s+", summary_text)
-                if s.strip()
+                s.strip() for s in re.split(r"(?<=[.!?])\s+", summary_text) if s.strip()
             ]
             flagged: list[str] = []
             threshold = 0.2

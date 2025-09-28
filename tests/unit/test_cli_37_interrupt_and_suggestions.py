@@ -29,7 +29,9 @@ def test_suggest_file_fixes_empty():
 
 
 def test_resolve_config_conflicts_local_rich():
-    opts, warnings = resolve_config_conflicts({"provider": "local", "output_format": "rich"})
+    opts, warnings = resolve_config_conflicts(
+        {"provider": "local", "output_format": "rich"}
+    )
     assert opts["output_format"] == "txt"
     assert warnings
 
@@ -41,7 +43,16 @@ def test_interactive_run_interrupt(monkeypatch):
 
     # create a temporary file path that exists for validation
     import tempfile
+
     with tempfile.NamedTemporaryFile() as tf:
-        res = session.run(tf.name, {"steps": 1, "simulate_work": True, "provider": "local", "output_format": "txt"})
+        res = session.run(
+            tf.name,
+            {
+                "steps": 1,
+                "simulate_work": True,
+                "provider": "local",
+                "output_format": "txt",
+            },
+        )
         assert res["status"] == "interrupted"
         assert res["error_type"] == "keyboard_interrupt"

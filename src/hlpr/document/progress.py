@@ -22,6 +22,7 @@ try:
         TextColumn,
         TimeElapsedColumn,
     )
+
     _RICH_AVAILABLE = True
 except Exception:  # noqa: BLE001
     _RICH_AVAILABLE = False
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 class ProcessingPhase(Enum):
     """Enumeration of document processing phases."""
+
     PARSING = "parsing"
     CHUNKING = "chunking"
     SUMMARIZING = "summarizing"
@@ -41,6 +43,7 @@ class ProcessingPhase(Enum):
 @dataclass
 class ProgressMetrics:
     """Metrics for tracking processing progress."""
+
     phase: ProcessingPhase
     start_time: float
     end_time: float | None = None
@@ -163,7 +166,8 @@ class RichProgressCallback(ProgressCallback):
 
         if metrics.phase in self.tasks:
             desc = "{}: {}".format(
-                metrics.phase.value.title(), metrics.current_item or "",
+                metrics.phase.value.title(),
+                metrics.current_item or "",
             )
             self.progress.update(
                 self.tasks[metrics.phase],
@@ -352,13 +356,15 @@ class ProgressTracker:
             duration = metrics.duration_ms or 0
             total_duration += duration
 
-            phase_summaries.append({
-                "phase": metrics.phase.value,
-                "duration_ms": duration,
-                "items_processed": metrics.items_processed,
-                "progress_percentage": metrics.progress_percentage,
-                "error": metrics.metadata.get("error"),
-            })
+            phase_summaries.append(
+                {
+                    "phase": metrics.phase.value,
+                    "duration_ms": duration,
+                    "items_processed": metrics.items_processed,
+                    "progress_percentage": metrics.progress_percentage,
+                    "error": metrics.metadata.get("error"),
+                }
+            )
 
         return {
             "total_duration_ms": total_duration,

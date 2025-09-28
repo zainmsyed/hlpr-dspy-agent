@@ -3,6 +3,7 @@
 Place small, well-documented constants here so multiple modules can import
 shared values instead of duplicating literals across the codebase.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence

@@ -4,6 +4,7 @@ This module provides a minimal, test-friendly implementation used by
 InteractiveSession. It avoids runtime input() calls in tests by returning
 defaults unless overridden by injected values.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -67,7 +68,9 @@ class OptionPrompts:
         if not isinstance(provider, str) or not provider:
             return False, PROVIDER_EMPTY_MSG
         if provider not in self._allowed_providers:
-            return False, PROVIDER_UNSUPPORTED_TEMPLATE.format(provider=provider, allowed=", ".join(self._allowed_providers))
+            return False, PROVIDER_UNSUPPORTED_TEMPLATE.format(
+                provider=provider, allowed=", ".join(self._allowed_providers)
+            )
         return True, "ok"
 
     def format_prompt(self) -> str:
@@ -84,7 +87,9 @@ class OptionPrompts:
         if not isinstance(fmt, str) or not fmt:
             return False, FORMAT_EMPTY_MSG
         if fmt not in self._allowed_formats:
-            return False, FORMAT_UNSUPPORTED_TEMPLATE.format(fmt=fmt, allowed=", ".join(self._allowed_formats))
+            return False, FORMAT_UNSUPPORTED_TEMPLATE.format(
+                fmt=fmt, allowed=", ".join(self._allowed_formats)
+            )
         return True, "ok"
 
     def save_file_prompt(self) -> tuple[bool, str | None]:

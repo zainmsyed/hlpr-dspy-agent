@@ -18,10 +18,14 @@ class DummyProgress(ProgressTracker):
 
 
 def test_keyboard_interrupt_handling(monkeypatch, tmp_path):
-    session = InteractiveSession(prompt_provider=DefaultPromptProvider({}), progress=DummyProgress())
+    session = InteractiveSession(
+        prompt_provider=DefaultPromptProvider({}), progress=DummyProgress()
+    )
 
     # Run with a small simulate_work to ensure it enters the progress loop
-    res = session.run(file_path=str(tmp_path), options={"steps": 1, "simulate_work": True})
+    res = session.run(
+        file_path=str(tmp_path), options={"steps": 1, "simulate_work": True}
+    )
 
     assert res["status"] in ("interrupted", "error")
     # If interrupted, error_type should indicate keyboard_interrupt

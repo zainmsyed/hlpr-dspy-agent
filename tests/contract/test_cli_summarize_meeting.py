@@ -102,7 +102,8 @@ class TestCliSummarizeMeetingContract:
         test_file.write_text(prov_text)
 
         result = runner.invoke(
-            app, ["summarize", "meeting", "--provider", "openai", str(test_file)],
+            app,
+            ["summarize", "meeting", "--provider", "openai", str(test_file)],
         )
 
         assert result.exit_code == 0

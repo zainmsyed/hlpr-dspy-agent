@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -41,13 +41,21 @@ class FileValidator:
         p = Path(path)
         msgs: list[ValidationMessage] = []
         if must_exist and not p.exists():
-            msgs.append(ValidationMessage(code="not_found", message=f"Path not found: {p}"))
+            msgs.append(
+                ValidationMessage(code="not_found", message=f"Path not found: {p}")
+            )
             return msgs
         if must_be_file and not p.is_file():
             msgs.append(ValidationMessage(code="not_file", message=f"Not a file: {p}"))
         try:
             if not os.access(p, os.R_OK):
-                msgs.append(ValidationMessage(code="not_readable", message=f"Not readable: {p}"))
+                msgs.append(
+                    ValidationMessage(code="not_readable", message=f"Not readable: {p}")
+                )
         except OSError:
-            msgs.append(ValidationMessage(code="access_error", message=f"Access check failed: {p}"))
+            msgs.append(
+                ValidationMessage(
+                    code="access_error", message=f"Access check failed: {p}"
+                )
+            )
         return msgs

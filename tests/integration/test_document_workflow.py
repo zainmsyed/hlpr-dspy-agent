@@ -45,8 +45,14 @@ class TestDocumentWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "summarize", "document", str(test_doc), "--save",
-                "--format", "md", "--output", str(md_output),
+                "summarize",
+                "document",
+                str(test_doc),
+                "--save",
+                "--format",
+                "md",
+                "--output",
+                str(md_output),
             ],
         )
         assert result.exit_code == 0
@@ -57,8 +63,14 @@ class TestDocumentWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "summarize", "document", str(test_doc), "--save",
-                "--format", "json", "--output", str(json_output),
+                "summarize",
+                "document",
+                str(test_doc),
+                "--save",
+                "--format",
+                "json",
+                "--output",
+                str(json_output),
             ],
         )
         assert result.exit_code == 0
@@ -83,7 +95,8 @@ class TestDocumentWorkflowIntegration:
 
         # Test with local provider (if available)
         result = runner.invoke(
-            app, ["summarize", "document", str(test_doc), "--provider", "local"],
+            app,
+            ["summarize", "document", str(test_doc), "--provider", "local"],
         )
         assert result.exit_code in [0, 1, 2]  # May succeed, fail, or be unavailable
 

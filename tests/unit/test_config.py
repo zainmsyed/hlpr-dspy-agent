@@ -1,4 +1,3 @@
-
 from hlpr.config import HlprConfig
 
 
@@ -23,7 +22,8 @@ def test_config_env_overrides(monkeypatch):
     monkeypatch.setenv("HLPR_MAX_FILE_SIZE", "1234")
     monkeypatch.setenv("HLPR_DEFAULT_TIMEOUT", "60")
     monkeypatch.setenv(
-        "HLPR_ALLOWED_ORIGINS", "http://localhost:3000, https://example.com",
+        "HLPR_ALLOWED_ORIGINS",
+        "http://localhost:3000, https://example.com",
     )
 
     cfg = HlprConfig.from_env()

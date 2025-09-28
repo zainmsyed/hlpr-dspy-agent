@@ -1,4 +1,3 @@
-
 from hlpr.llm.dspy_integration import DSPyDocumentSummarizer
 
 
@@ -8,7 +7,7 @@ def test_normalize_key_points_merges_multiline_string_and_strips_markers():
         "• wrtr\n"
         "is a terminal-based markdown writing application.\n"
         "• It was developed using 'vibe coding'\n"
-    "- AI-assisted coding with Cursor Composer w Sonnet.\n"
+        "- AI-assisted coding with Cursor Composer w Sonnet.\n"
         "- The project is currently in alpha and available on GitHub.\n"
     )
 
@@ -17,7 +16,7 @@ def test_normalize_key_points_merges_multiline_string_and_strips_markers():
     # Expect continuation lines to be merged and markers removed
     assert result == [
         "wrtr is a terminal-based markdown writing application.",
-    "It was developed using 'vibe coding' - AI-assisted coding with Cursor Composer w Sonnet.",
+        "It was developed using 'vibe coding' - AI-assisted coding with Cursor Composer w Sonnet.",
         "The project is currently in alpha and available on GitHub.",
     ]
 

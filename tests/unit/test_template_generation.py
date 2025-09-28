@@ -10,4 +10,3 @@ def test_command_template_defaults():
     assert isinstance(t.created, datetime)
     # ensure timezone-aware
     assert t.created.tzinfo is not None
-

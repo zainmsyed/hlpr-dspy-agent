@@ -253,8 +253,10 @@ class PhaseTracker:
         completed_phases = sum(self._phase_complete)
 
         # Only add current phase progress if we're actively in a phase
-        if (self.current_phase_index < len(self.phases) and
-            self._progress_tracker.is_started()):
+        if (
+            self.current_phase_index < len(self.phases)
+            and self._progress_tracker.is_started()
+        ):
             current_phase_progress = self._progress_tracker.percentage / 100.0
         else:
             current_phase_progress = 0.0

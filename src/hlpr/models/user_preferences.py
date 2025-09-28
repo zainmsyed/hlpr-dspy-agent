@@ -2,6 +2,7 @@
 
 Small, file-backed preferences manager used by guided mode and templates.
 """
+
 from __future__ import annotations
 
 import json

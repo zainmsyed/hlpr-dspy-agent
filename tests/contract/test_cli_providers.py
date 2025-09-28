@@ -121,7 +121,8 @@ class TestCliProvidersContract:
         if result1.exit_code == 0:
             # Then test connection
             result2 = runner.invoke(
-                app, ["providers", "test", "test_conn"],
+                app,
+                ["providers", "test", "test_conn"],
             )
             # Connection test may succeed or fail
             assert result2.exit_code in [0, 1, 3]

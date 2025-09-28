@@ -4,6 +4,7 @@ Provides correlation id generation and helpers to build `extra` dicts for
 logger calls. Kept intentionally tiny so it can be used in CLI, API, and
 library code without pulling in external structured-logging libs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

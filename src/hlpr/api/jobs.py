@@ -18,9 +18,7 @@ def get_job(job_id: str) -> JSONResponse:
     Returns:
         JSONResponse with either job data (not implemented) or error body.
     """
-    uuid_regex = (
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-    )
+    uuid_regex = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     if not re.match(uuid_regex, job_id):
         return JSONResponse(
             status_code=422,

@@ -4,6 +4,7 @@ This module extracts the option-collection responsibilities from
 `InteractiveSession` so the session class can remain focused on orchestration
 and flow control. The helpers are small, synchronous, and test-friendly.
 """
+
 from typing import Any
 
 from hlpr.models.interactive import ProcessingOptions
@@ -28,7 +29,9 @@ def collect_basic_options(prompt_provider: Any) -> ProcessingOptions:
     )
 
 
-def collect_advanced_options(base_options: ProcessingOptions, prompt_provider: Any) -> dict[str, object]:
+def collect_advanced_options(
+    base_options: ProcessingOptions, prompt_provider: Any
+) -> dict[str, object]:
     """Collect advanced option fields and return a dict of updates.
 
     The caller can merge these updates into an existing ProcessingOptions

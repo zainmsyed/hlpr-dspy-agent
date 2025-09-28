@@ -1,5 +1,3 @@
-
-
 def test_file_validation_integration():
     """T011: Integration test for file validation behavior.
 

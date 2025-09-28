@@ -1,4 +1,5 @@
 """Manager for saving and loading command templates."""
+
 from __future__ import annotations
 
 import asyncio

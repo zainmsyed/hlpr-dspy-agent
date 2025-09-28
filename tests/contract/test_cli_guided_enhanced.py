@@ -14,7 +14,9 @@ def test_guided_mode_has_run_method():
 
     session = InteractiveSession()
     # The implementation should provide a `run_guided_workflow` method or similar
-    assert hasattr(session, "run_guided_workflow"), "InteractiveSession missing run_guided_workflow()"
+    assert hasattr(session, "run_guided_workflow"), (
+        "InteractiveSession missing run_guided_workflow()"
+    )
 
 
 def test_command_template_generation_interface():
@@ -25,7 +27,9 @@ def test_command_template_generation_interface():
         pytest.skip(f"InteractiveSession not importable: {e}")
 
     session = InteractiveSession()
-    assert hasattr(session, "generate_command_template"), "Missing generate_command_template()"
+    assert hasattr(session, "generate_command_template"), (
+        "Missing generate_command_template()"
+    )
 
 
 def test_keyboard_interrupt_interface():
@@ -36,4 +40,6 @@ def test_keyboard_interrupt_interface():
         pytest.skip(f"InteractiveSession not importable: {e}")
 
     session = InteractiveSession()
-    assert hasattr(session, "handle_keyboard_interrupt"), "Missing handle_keyboard_interrupt()"
+    assert hasattr(session, "handle_keyboard_interrupt"), (
+        "Missing handle_keyboard_interrupt()"
+    )

@@ -1,4 +1,5 @@
 """Unit tests for CLI renderers."""
+
 import json
 from datetime import UTC, datetime
 
@@ -85,7 +86,9 @@ class TestRichRenderer:
         assert "Failed to process document" in output
         assert "line" in output  # From details
 
-    def test_render_result_list(self, sample_processing_result, error_processing_result):
+    def test_render_result_list(
+        self, sample_processing_result, error_processing_result
+    ):
         """Test rendering a list of results."""
         renderer = RichRenderer()
         results = [sample_processing_result, error_processing_result]
@@ -150,7 +153,9 @@ class TestJsonRenderer:
         assert result_data["error"]["message"] == "Failed to process document"
         assert result_data["error"]["details"]["line"] == 42
 
-    def test_render_result_list(self, sample_processing_result, error_processing_result):
+    def test_render_result_list(
+        self, sample_processing_result, error_processing_result
+    ):
         """Test rendering a list of results as JSON."""
         renderer = JsonRenderer()
         results = [sample_processing_result, error_processing_result]
@@ -204,7 +209,9 @@ class TestMarkdownRenderer:
         assert "**Message:** Failed to process document" in output
         assert "```json" in output  # Details should be in JSON block
 
-    def test_render_result_list(self, sample_processing_result, error_processing_result):
+    def test_render_result_list(
+        self, sample_processing_result, error_processing_result
+    ):
         """Test rendering a list of results as Markdown."""
         renderer = MarkdownRenderer()
         results = [sample_processing_result, error_processing_result]
@@ -257,7 +264,9 @@ class TestPlainTextRenderer:
         assert "Message: Failed to process document" in output
         assert "Details:" in output
 
-    def test_render_result_list(self, sample_processing_result, error_processing_result):
+    def test_render_result_list(
+        self, sample_processing_result, error_processing_result
+    ):
         """Test rendering a list of results as plain text."""
         renderer = PlainTextRenderer()
         results = [sample_processing_result, error_processing_result]

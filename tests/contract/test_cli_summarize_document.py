@@ -29,7 +29,8 @@ class TestCliSummarizeDocumentContract:
         test_file.write_text("Test content for provider-specific summarization.")
 
         result = runner.invoke(
-            app, ["summarize", "document", "--provider", "local", str(test_file)],
+            app,
+            ["summarize", "document", "--provider", "local", str(test_file)],
         )
 
         assert result.exit_code == 0

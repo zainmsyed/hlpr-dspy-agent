@@ -1,4 +1,5 @@
 """Command template model used to persist and display saved command templates."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

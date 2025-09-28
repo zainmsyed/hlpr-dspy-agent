@@ -74,6 +74,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # Add CORS middleware
 def _get_allowed_origins() -> list[str]:
     """Return allowed CORS origins from environment or sane defaults.

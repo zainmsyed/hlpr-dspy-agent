@@ -71,7 +71,9 @@ def summarize(
 
                 if summarizer is None:
                     # Best-effort stub
-                    return ProcessingResult(file=file_sel, summary=f"(stub) summary for {file_sel.path}")
+                    return ProcessingResult(
+                        file=file_sel, summary=f"(stub) summary for {file_sel.path}"
+                    )
 
                 result = summarizer.summarize_document(doc)
 
@@ -87,10 +89,11 @@ def summarize(
                 # processing_time_ms -> ProcessingMetadata.duration_seconds
                 proc_ms = getattr(result, "processing_time_ms", None)
                 if proc_ms is not None:
-
                     # create ProcessingMetadata with duration_seconds
                     try:
-                        pr.metadata = ProcessingMetadata(duration_seconds=(proc_ms / 1000.0))
+                        pr.metadata = ProcessingMetadata(
+                            duration_seconds=(proc_ms / 1000.0)
+                        )
                     except Exception:
                         pr.metadata = None
 
@@ -98,12 +101,16 @@ def summarize(
             except HlprError as e:
                 return ProcessingResult(
                     file=file_sel,
-                    error=ProcessingError(message=str(e), details={"type": type(e).__name__}),
+                    error=ProcessingError(
+                        message=str(e), details={"type": type(e).__name__}
+                    ),
                 )
             except Exception as e:  # pragma: no cover - defensive
                 return ProcessingResult(
                     file=file_sel,
-                    error=ProcessingError(message=str(e), details={"type": type(e).__name__}),
+                    error=ProcessingError(
+                        message=str(e), details={"type": type(e).__name__}
+                    ),
                 )
 
         return adapter

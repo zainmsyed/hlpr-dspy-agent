@@ -98,7 +98,8 @@ class DocumentParser:
             # Raise a clear domain error for unsupported formats
             msg = f"Unsupported format: {file_format}"
             ex = DocumentProcessingError(
-                message=msg, details={"format": str(file_format)},
+                message=msg,
+                details={"format": str(file_format)},
             )
 
             _raise_exception(ex)

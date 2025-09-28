@@ -4,6 +4,7 @@ Provides a small, test-friendly API to show provider/format help and
 general quick-help panels. Designed to be injectable into InteractiveSession
 so UI implementations can render consistent help content.
 """
+
 from __future__ import annotations
 
 from rich.console import Console

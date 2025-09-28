@@ -40,12 +40,14 @@ class DocumentSummaryResponse(BaseModel):
     id: str = Field(..., description="Unique identifier for the summary")
     summary: str = Field(..., description="Generated summary")
     key_points: list[str] = Field(
-        default_factory=list, description="Extracted key points",
+        default_factory=list,
+        description="Extracted key points",
     )
     word_count: int = Field(..., description="Original document word count")
     processing_time_ms: int = Field(..., description="Time taken to process")
     provider_used: str = Field(
-        ..., description="AI provider that generated the summary",
+        ...,
+        description="AI provider that generated the summary",
     )
     format: str = Field(..., description="Response format")
 
@@ -63,19 +65,22 @@ class MeetingSummaryResponse(BaseModel):
 
     id: str = Field(..., description="Unique identifier for the meeting summary")
     overview: str = Field(
-        ..., description="Short overview / summary of the meeting",
+        ...,
+        description="Short overview / summary of the meeting",
     )
     key_points: list[str] = Field(
-        default_factory=list, description="Key points from the meeting",
+        default_factory=list,
+        description="Key points from the meeting",
     )
     action_items: list[str] = Field(
-        default_factory=list, description="Extracted action items",
+        default_factory=list,
+        description="Extracted action items",
     )
     participants: list[str] = Field(
-        default_factory=list, description="Detected participants",
+        default_factory=list,
+        description="Detected participants",
     )
     processing_time_ms: int = Field(..., description="Time taken to process")
-
 
 
 class SummarizeTextRequest(BaseModel):
@@ -125,12 +130,14 @@ def _process_file_upload(
             ErrorResponse(
                 error=f"File size exceeds maximum limit of {max_mb}MB",
                 error_code="FILE_TOO_LARGE",
-                details=safe_serialize({
-                    "max_size_bytes": MAX_FILE_SIZE,
-                    "actual_size_bytes": file_size,
-                    "max_size_mb": max_mb,
-                    "actual_size_mb": actual_mb,
-                }),
+                details=safe_serialize(
+                    {
+                        "max_size_bytes": MAX_FILE_SIZE,
+                        "actual_size_bytes": file_size,
+                        "max_size_mb": max_mb,
+                        "actual_size_mb": actual_mb,
+                    }
+                ),
             ),
         )
 
@@ -170,7 +177,8 @@ def _process_file_upload(
         # Generate summary
         if len(extracted_text) > 8192:
             result = summarizer.summarize_large_document(
-                document, chunking_strategy="sentence",
+                document,
+                chunking_strategy="sentence",
             )
         else:
             result = summarizer.summarize_document(document)
@@ -223,12 +231,14 @@ def _process_text_request(
             ErrorResponse(
                 error=f"Text content exceeds maximum length of {max_mb}MB",
                 error_code="TEXT_TOO_LONG",
-                details=safe_serialize({
-                    "max_length_bytes": MAX_TEXT_LENGTH,
-                    "actual_length_bytes": text_length,
-                    "max_length_mb": max_mb,
-                    "actual_length_mb": actual_mb,
-                }),
+                details=safe_serialize(
+                    {
+                        "max_length_bytes": MAX_TEXT_LENGTH,
+                        "actual_length_bytes": text_length,
+                        "max_length_mb": max_mb,
+                        "actual_length_mb": actual_mb,
+                    }
+                ),
             ),
         )
 
@@ -267,9 +277,13 @@ def _extract_meeting_items(text: str) -> tuple[list[str], list[str]]:
             continue
 
         # crude heuristic: lines with 'will', 'needs to', 'should', 'to'
-        if any(k in low for k in [" will ", " needs to ", " should ", " to "]) and len(
-            line.strip(),
-        ) > 5:
+        if (
+            any(k in low for k in [" will ", " needs to ", " should ", " to "])
+            and len(
+                line.strip(),
+            )
+            > 5
+        ):
             action_items.append(line.strip())
 
         if low.startswith(("attendees:", "present:")):
@@ -283,8 +297,6 @@ def _extract_meeting_items(text: str) -> tuple[list[str], list[str]]:
             break
 
     return action_items, participants
-
-
 
     # duplicate helper removed
 
@@ -396,12 +408,14 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
             error = ErrorResponse(
                 error=f"Text content exceeds maximum length of {max_mb}MB",
                 error_code="TEXT_TOO_LONG",
-                details=safe_serialize({
-                    "max_length_bytes": MAX_TEXT_LENGTH,
-                    "actual_length_bytes": text_length,
-                    "max_length_mb": max_mb,
-                    "actual_length_mb": actual_mb,
-                }),
+                details=safe_serialize(
+                    {
+                        "max_length_bytes": MAX_TEXT_LENGTH,
+                        "actual_length_bytes": text_length,
+                        "max_length_mb": max_mb,
+                        "actual_length_mb": actual_mb,
+                    }
+                ),
             )
             return JSONResponse(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -455,7 +469,9 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
         logger.warning(
             "Domain error while processing request",
             extra=build_safe_extra(
-                log_ctx, error=str(he), error_code=getattr(he, "code", "HLPR_ERROR"),
+                log_ctx,
+                error=str(he),
+                error_code=getattr(he, "code", "HLPR_ERROR"),
             ),
         )
         raise HTTPException(
@@ -545,6 +561,8 @@ async def summarize_document_text(
     response_obj.format = request.format or response_obj.format
     content = safe_serialize(response_obj.model_dump())
     return JSONResponse(status_code=status.HTTP_200_OK, content=content)
+
+
 async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryResponse:
     """Summarize raw text content."""
     start_time = time.time()
@@ -587,7 +605,6 @@ async def summarize_text(request: SummarizeTextRequest) -> DocumentSummaryRespon
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=detail,
         ) from e
-
 
 
 @router.post(

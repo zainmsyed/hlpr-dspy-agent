@@ -1,7 +1,6 @@
 from pathlib import Path
-from io import StringIO
 
-from hlpr.utils.file_validation import FileValidator, ValidationMessage
+from hlpr.utils.file_validation import FileValidator
 
 
 def test_exists_and_readable(tmp_path: Path):

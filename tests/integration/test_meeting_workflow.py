@@ -53,8 +53,13 @@ class TestMeetingWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "summarize", "meeting", str(meeting_file),
-                "--title", "Sprint Planning", "--date", "2025-09-09",
+                "summarize",
+                "meeting",
+                str(meeting_file),
+                "--title",
+                "Sprint Planning",
+                "--date",
+                "2025-09-09",
             ],
         )
         assert result.exit_code == 0
@@ -80,8 +85,14 @@ class TestMeetingWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "summarize", "meeting", str(meeting_file),
-                "--save", "--format", "json", "--output", str(output_file),
+                "summarize",
+                "meeting",
+                str(meeting_file),
+                "--save",
+                "--format",
+                "json",
+                "--output",
+                str(output_file),
             ],
         )
         assert result.exit_code == 0

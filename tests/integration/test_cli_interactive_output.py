@@ -22,6 +22,7 @@ def test_interactive_output_shows_panels(tmp_path):
     try:
         import hlpr.config.ui_strings as ui_strings
     except ImportError:
+
         class _Fallback:
             PANEL_STARTING = "Starting"
             PANEL_COMPLETE = "Complete"

@@ -4,6 +4,7 @@
 This mirrors the `/summarize/document` endpoint flow but runs synchronously
 from the repo so we can demonstrate DSPy output without starting the API.
 """
+
 import json
 import logging
 import time

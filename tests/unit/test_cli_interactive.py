@@ -23,7 +23,8 @@ def test_interactive_run_file_validation_failure(tmp_path):
     sess = InteractiveSession(display=None, progress=None)
     # nonexistent file should return error
     res = sess.run(
-        str(tmp_path / "nope.txt"), {"provider": "local", "output_format": "md"},
+        str(tmp_path / "nope.txt"),
+        {"provider": "local", "output_format": "md"},
     )
     assert res["status"] == "error"
 

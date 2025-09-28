@@ -1,4 +1,5 @@
 """ProcessingOptions model for interactive guided workflow."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -62,4 +63,3 @@ class ProcessingOptions(BaseModel):
     def normalize_temperature(cls, v: float) -> float:
         # limit to sensible precision for CLI representation
         return round(float(v), 3)
-

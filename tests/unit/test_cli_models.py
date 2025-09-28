@@ -13,8 +13,11 @@ from hlpr.cli.models import (
 
 
 def test_file_selection_and_provider_option():
-    fs = FileSelection(path="docs/examples/cover_letter.txt", size_bytes=1024,
-                       mime_type="application/pdf")
+    fs = FileSelection(
+        path="docs/examples/cover_letter.txt",
+        size_bytes=1024,
+        mime_type="application/pdf",
+    )
     po = ProviderOption(name="local", description="local LLM", default=True)
     # file path should retain the provided filename
     assert fs.path.endswith("cover_letter.txt")

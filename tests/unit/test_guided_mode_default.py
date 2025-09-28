@@ -4,6 +4,7 @@ def test_run_guided_workflow_default(tmp_path):
         from hlpr.cli.interactive import InteractiveSession
     except ImportError:
         import pytest
+
         pytest.skip("InteractiveSession not importable")
 
     sample = tmp_path / "sample.md"

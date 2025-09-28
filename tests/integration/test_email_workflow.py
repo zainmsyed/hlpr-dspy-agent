@@ -18,9 +18,16 @@ class TestEmailWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "email", "accounts", "add", "test_workflow",
-                "--provider", "gmail", "--username", "test@gmail.com",
-                "--password", "testpass",
+                "email",
+                "accounts",
+                "add",
+                "test_workflow",
+                "--provider",
+                "gmail",
+                "--username",
+                "test@gmail.com",
+                "--password",
+                "testpass",
             ],
         )
         # Should succeed or fail gracefully
@@ -35,7 +42,8 @@ class TestEmailWorkflowIntegration:
         """Test complete email processing workflow"""
         # Test processing emails (will fail without real account setup)
         result = runner.invoke(
-            app, ["email", "process", "test_workflow", "--limit", "5"],
+            app,
+            ["email", "process", "test_workflow", "--limit", "5"],
         )
         # Should attempt processing or fail gracefully
         assert result.exit_code in [0, 1, 2]  # Success, general error, or config error
@@ -50,8 +58,12 @@ class TestEmailWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "email", "process", "test_workflow",
-                "--unread-only", "--limit", "10",
+                "email",
+                "process",
+                "test_workflow",
+                "--unread-only",
+                "--limit",
+                "10",
             ],
         )
         assert result.exit_code in [0, 1, 2]
@@ -60,8 +72,13 @@ class TestEmailWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "email", "process", "test_workflow",
-                "--since", "2025-09-01", "--limit", "5",
+                "email",
+                "process",
+                "test_workflow",
+                "--since",
+                "2025-09-01",
+                "--limit",
+                "5",
             ],
         )
         assert result.exit_code in [0, 1, 2]
@@ -70,8 +87,11 @@ class TestEmailWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "email", "process", "test_workflow",
-                "--from", "important@company.com",
+                "email",
+                "process",
+                "test_workflow",
+                "--from",
+                "important@company.com",
             ],
         )
         assert result.exit_code in [0, 1, 2]
@@ -82,8 +102,16 @@ class TestEmailWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "email", "process", "test_workflow", "--save",
-                "--format", "csv", "--output", str(output_file), "--limit", "3",
+                "email",
+                "process",
+                "test_workflow",
+                "--save",
+                "--format",
+                "csv",
+                "--output",
+                str(output_file),
+                "--limit",
+                "3",
             ],
         )
         assert result.exit_code in [0, 1, 2]
@@ -99,8 +127,7 @@ class TestEmailWorkflowIntegration:
         result = runner.invoke(app, ["email", "process", "nonexistent_account"])
         assert result.exit_code == 1
         assert (
-            "not found" in result.output.lower()
-            or "account" in result.output.lower()
+            "not found" in result.output.lower() or "account" in result.output.lower()
         )
 
         # Test with invalid limit
@@ -113,18 +140,22 @@ class TestEmailWorkflowIntegration:
     def test_email_workflow_table_output(self):
         """Test that email processing shows proper table output"""
         result = runner.invoke(
-            app, ["email", "process", "test_workflow", "--limit", "5"],
+            app,
+            ["email", "process", "test_workflow", "--limit", "5"],
         )
         # Should show table headers even if no emails processed
         if result.exit_code == 0:
             output_lower = result.output.lower()
             # Look for table elements
             table_indicators = [
-                "sender", "subject", "date", "classification", "priority",
+                "sender",
+                "subject",
+                "date",
+                "classification",
+                "priority",
             ]
             found_indicators = sum(
-                1 for indicator in table_indicators
-                if indicator in output_lower
+                1 for indicator in table_indicators if indicator in output_lower
             )
             # Should have at least some table structure
             assert found_indicators >= 2
@@ -132,17 +163,22 @@ class TestEmailWorkflowIntegration:
     def test_email_workflow_summary_statistics(self):
         """Test that email processing shows summary statistics"""
         result = runner.invoke(
-            app, ["email", "process", "test_workflow", "--limit", "10"],
+            app,
+            ["email", "process", "test_workflow", "--limit", "10"],
         )
         if result.exit_code == 0:
             output_lower = result.output.lower()
             # Should show some statistics
             stat_indicators = [
-                "processed", "total", "work", "personal", "high", "medium", "low",
+                "processed",
+                "total",
+                "work",
+                "personal",
+                "high",
+                "medium",
+                "low",
             ]
-            found_stats = sum(
-                1 for stat in stat_indicators if stat in output_lower
-            )
+            found_stats = sum(1 for stat in stat_indicators if stat in output_lower)
             # Should have at least basic statistics
             assert found_stats >= 1
 
@@ -152,16 +188,24 @@ class TestEmailWorkflowIntegration:
         result1 = runner.invoke(
             app,
             [
-                "email", "accounts", "add", "workflow_test",
-                "--provider", "gmail", "--username", "workflow@gmail.com",
-                "--password", "pass",
+                "email",
+                "accounts",
+                "add",
+                "workflow_test",
+                "--provider",
+                "gmail",
+                "--username",
+                "workflow@gmail.com",
+                "--password",
+                "pass",
             ],
         )
 
         if result1.exit_code == 0:
             # Test account
             result2 = runner.invoke(
-                app, ["email", "accounts", "test", "workflow_test"],
+                app,
+                ["email", "accounts", "test", "workflow_test"],
             )
             assert result2.exit_code in [0, 1]  # Test may succeed or fail
 
@@ -172,6 +216,7 @@ class TestEmailWorkflowIntegration:
 
             # Remove account
             result4 = runner.invoke(
-                app, ["email", "accounts", "remove", "workflow_test"],
+                app,
+                ["email", "accounts", "remove", "workflow_test"],
             )
             assert result4.exit_code == 0

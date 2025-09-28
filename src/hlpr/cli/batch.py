@@ -99,8 +99,7 @@ class BatchProcessor:
                 max_workers=self.options.max_workers,
             ) as executor:
                 future_to_file = {
-                    executor.submit(summarize_fn, f): f
-                    for f in valid_files
+                    executor.submit(summarize_fn, f): f for f in valid_files
                 }
                 for fut in concurrent.futures.as_completed(future_to_file):
                     f = future_to_file[fut]
@@ -110,7 +109,8 @@ class BatchProcessor:
                         LOGGER.exception("Error summarizing %s", f.path)
                         res = ProcessingResult(file=f)
                         res.error = ProcessingError(
-                            message=str(excp), details={"type": type(excp).__name__},
+                            message=str(excp),
+                            details={"type": type(excp).__name__},
                         )
                     results.append(res)
                     prog.advance(1)

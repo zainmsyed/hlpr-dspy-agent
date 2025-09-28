@@ -25,6 +25,7 @@ def test_interactive_session_with_phases(tmp_path):
     try:
         import hlpr.config.ui_strings as ui_strings
     except ImportError:
+
         class _Fallback:
             PANEL_COMPLETE = "Complete"
 

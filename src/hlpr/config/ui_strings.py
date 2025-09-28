@@ -4,6 +4,7 @@ Centralize UI messages and help summaries so they can be reused across
 validators, prompts, and help display components, and so they are easier to
 translate or test.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -52,9 +53,7 @@ PROVIDER_UNSUPPORTED_TEMPLATE = (
 )
 
 FORMAT_EMPTY_MSG = "Format must be a non-empty string"
-FORMAT_UNSUPPORTED_TEMPLATE = (
-    "Unsupported format: '{fmt}'. Supported: {allowed}"
-)
+FORMAT_UNSUPPORTED_TEMPLATE = "Unsupported format: '{fmt}'. Supported: {allowed}"
 TEMPERATURE_INVALID_MSG = "Temperature must be a number between 0.0 and 1.0"
 TEMPERATURE_RANGE_MSG = "Temperature must be between 0.0 and 1.0"
 

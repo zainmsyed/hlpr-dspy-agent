@@ -3,6 +3,7 @@
 These models are minimal and intended for Phase 3.3. They use pydantic for
 validation and will be expanded as features are implemented.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

@@ -16,8 +16,13 @@ class TestProviderWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "providers", "add", "openai_test", "--type", "openai",
-                "--api-key", "sk-test123456789",
+                "providers",
+                "add",
+                "openai_test",
+                "--type",
+                "openai",
+                "--api-key",
+                "sk-test123456789",
             ],
         )
         assert result.exit_code in [0, 1]
@@ -26,8 +31,13 @@ class TestProviderWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "providers", "add", "anthropic_test", "--type", "anthropic",
-                "--api-key", "sk-ant-test123456789",
+                "providers",
+                "add",
+                "anthropic_test",
+                "--type",
+                "anthropic",
+                "--api-key",
+                "sk-ant-test123456789",
             ],
         )
         assert result.exit_code in [0, 1]
@@ -38,7 +48,8 @@ class TestProviderWorkflowIntegration:
         # Should show at least the providers we tried to add
         output_lower = result.output.lower()
         assert (
-            "openai" in output_lower or "anthropic" in output_lower
+            "openai" in output_lower
+            or "anthropic" in output_lower
             or "test" in output_lower
         )
 
@@ -71,8 +82,13 @@ class TestProviderWorkflowIntegration:
         result1 = runner.invoke(
             app,
             [
-                "providers", "add", "remove_test", "--type", "openai",
-                "--api-key", "sk-remove123",
+                "providers",
+                "add",
+                "remove_test",
+                "--type",
+                "openai",
+                "--api-key",
+                "sk-remove123",
             ],
         )
 
@@ -92,16 +108,20 @@ class TestProviderWorkflowIntegration:
         result = runner.invoke(app, ["providers", "test", "nonexistent_provider"])
         assert result.exit_code == 1
         assert (
-            "not found" in result.output.lower()
-            or "provider" in result.output.lower()
+            "not found" in result.output.lower() or "provider" in result.output.lower()
         )
 
         # Test adding provider with invalid type
         result = runner.invoke(
             app,
             [
-                "providers", "add", "invalid_test", "--type", "invalid_type",
-                "--api-key", "test",
+                "providers",
+                "add",
+                "invalid_test",
+                "--type",
+                "invalid_type",
+                "--api-key",
+                "test",
             ],
         )
         assert result.exit_code == 1
@@ -113,11 +133,19 @@ class TestProviderWorkflowIntegration:
         result = runner.invoke(
             app,
             [
-                "providers", "add", "config_test", "--type", "openai",
-                "--api-key", "sk-config123",
-                "--model", "gpt-4",
-                "--temperature", "0.7",
-                "--max-tokens", "2000",
+                "providers",
+                "add",
+                "config_test",
+                "--type",
+                "openai",
+                "--api-key",
+                "sk-config123",
+                "--model",
+                "gpt-4",
+                "--temperature",
+                "0.7",
+                "--max-tokens",
+                "2000",
             ],
         )
         assert result.exit_code in [0, 1]
@@ -129,11 +157,15 @@ class TestProviderWorkflowIntegration:
             # Should show configuration details
             output_lower = result.output.lower()
             config_indicators = [
-                "model", "temperature", "max-tokens", "gpt-4", "0.7", "2000",
+                "model",
+                "temperature",
+                "max-tokens",
+                "gpt-4",
+                "0.7",
+                "2000",
             ]
             found_config = sum(
-                1 for indicator in config_indicators
-                if str(indicator) in output_lower
+                1 for indicator in config_indicators if str(indicator) in output_lower
             )
             assert found_config >= 2
 
@@ -152,8 +184,11 @@ class TestProviderWorkflowIntegration:
             result = runner.invoke(
                 app,
                 [
-                    "summarize", "document", "nonexistent.pdf",
-                    "--provider", "openai_test",
+                    "summarize",
+                    "document",
+                    "nonexistent.pdf",
+                    "--provider",
+                    "openai_test",
                 ],
             )
             # Should attempt to use the provider or fail gracefully
@@ -165,15 +200,25 @@ class TestProviderWorkflowIntegration:
         result1 = runner.invoke(
             app,
             [
-                "providers", "add", "switch1", "--type", "openai",
-                "--api-key", "sk-switch1",
+                "providers",
+                "add",
+                "switch1",
+                "--type",
+                "openai",
+                "--api-key",
+                "sk-switch1",
             ],
         )
         result2 = runner.invoke(
             app,
             [
-                "providers", "add", "switch2", "--type", "anthropic",
-                "--api-key", "sk-switch2",
+                "providers",
+                "add",
+                "switch2",
+                "--type",
+                "anthropic",
+                "--api-key",
+                "sk-switch2",
             ],
         )
 

@@ -1,4 +1,5 @@
 """Integration tests for CLI renderers with real data flow."""
+
 from datetime import UTC, datetime
 
 from hlpr.cli.models import (
@@ -33,7 +34,7 @@ def test_renderers_with_realistic_processing_result():
     result = ProcessingResult(
         file=file_selection,
         summary="This document provides a comprehensive welcome guide to the WRTR platform, "
-               "covering key features, getting started steps, and best practices for users.",
+        "covering key features, getting started steps, and best practices for users.",
         metadata=metadata,
         error=None,
     )
@@ -64,6 +65,7 @@ def test_renderers_with_realistic_processing_result():
 
     # JSON should be parseable
     import json
+
     json_data = json.loads(outputs["json"])
     assert "data" in json_data
     assert "meta" in json_data
@@ -102,7 +104,12 @@ def test_renderers_with_error_scenario():
         error=error,
     )
 
-    renderers = [RichRenderer(), JsonRenderer(), MarkdownRenderer(), PlainTextRenderer()]
+    renderers = [
+        RichRenderer(),
+        JsonRenderer(),
+        MarkdownRenderer(),
+        PlainTextRenderer(),
+    ]
 
     for renderer in renderers:
         output = renderer.render(result)
@@ -137,13 +144,18 @@ def test_renderers_preserve_data_integrity():
         error=None,
     )
 
-    for renderer in [RichRenderer(), JsonRenderer(), MarkdownRenderer(), PlainTextRenderer()]:
+    for renderer in [
+        RichRenderer(),
+        JsonRenderer(),
+        MarkdownRenderer(),
+        PlainTextRenderer(),
+    ]:
         output = renderer.render(result)
 
         # Check that special characters are preserved
         assert "file with spaces & special-chars.txt" in output
         assert "中文" in output  # Chinese characters
-        assert "🚀" in output    # Emoji
+        assert "🚀" in output  # Emoji
         assert "émojis" in output  # Accented characters
-        assert "©®™" in output    # Symbols
+        assert "©®™" in output  # Symbols
         assert "3.14159" in output  # Precise numbers

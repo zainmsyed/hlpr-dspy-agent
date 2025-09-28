@@ -64,14 +64,12 @@ def summarize_document(
     provider: str = typer.Option(
         "local",
         "--provider",
-        help=(
-            "AI provider to use [local|openai|anthropic|groq|together]"
-        ),
+        help=("AI provider to use [local|openai|anthropic|groq|together]"),
     ),
-        save: bool = typer.Option(
-            default=False,
-            help="Save summary to file",
-        ),
+    save: bool = typer.Option(
+        default=False,
+        help="Save summary to file",
+    ),
     output_format: str = typer.Option(
         "rich",
         "--format",
@@ -95,11 +93,9 @@ def summarize_document(
     chunking_strategy: str = typer.Option(
         "sentence",
         "--chunking-strategy",
-        help=(
-            "Chunking strategy [sentence|paragraph|fixed|token]"
-        ),
+        help=("Chunking strategy [sentence|paragraph|fixed|token]"),
     ),
-    verbose: bool = typer.Option(
+    _verbose: bool = typer.Option(
         default=False,
         help="Enable verbose output",
     ),
@@ -148,7 +144,7 @@ def summarize_document(
             "CLI document summarization started",
             extra=build_safe_extra(log_ctx, **start_extra),
         )
-        document, extracted_text = _parse_with_progress(file_path, verbose)
+        document, extracted_text = _parse_with_progress(file_path)
 
         # Initialize summarizer (use CONFIG.default_timeout when not provided)
         timeout_val = (
@@ -173,7 +169,6 @@ def summarize_document(
             chunk_size,
             chunk_overlap,
             chunking_strategy,
-            verbose,
         )
 
         # Display results
@@ -182,8 +177,8 @@ def summarize_document(
         if CONFIG.include_file_paths:
             complete_extra["file"] = str(path)
         if CONFIG.performance_logging:
-            complete_extra["processing_time_ms"] = (
-                getattr(result, "processing_time_ms", None)
+            complete_extra["processing_time_ms"] = getattr(
+                result, "processing_time_ms", None
             )
 
         logger.info(
@@ -237,9 +232,7 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         console.print(summary_panel)
 
         if result.key_points:
-            key_points_text = "\n".join(
-                f"• {point}" for point in result.key_points
-            )
+            key_points_text = "\n".join(f"• {point}" for point in result.key_points)
             key_points_panel = Panel(
                 key_points_text,
                 title="[bold green]Key Points[/bold green]",
@@ -253,7 +246,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         metadata.append(f"Format: {document.format.value.upper()}\n")
         metadata.append(f"Size: {document.size_bytes:,} bytes\n")
         proc_ms = getattr(result, "processing_time_ms", None)
-        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        proc_seconds_str = (
+            f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        )
         metadata.append(f"Processing time: {proc_seconds_str}\n")
         metadata.append("Provider: {}".format(getattr(result, "provider", "unknown")))
 
@@ -286,7 +281,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
             "key_points": result.key_points,
             "hallucinations": getattr(result, "hallucinations", []),
             "processing_time_ms": proc_ms,
-            "processing_time_seconds": (proc_ms / 1000.0) if proc_ms is not None else None,
+            "processing_time_seconds": (proc_ms / 1000.0)
+            if proc_ms is not None
+            else None,
             "provider": getattr(result, "provider", None),
         }
         console.print_json(data=output_data)
@@ -297,7 +294,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         console.print(f"Format: {document.format.value.upper()}")
         console.print(f"Size: {document.size_bytes:,} bytes")
         proc_ms = getattr(result, "processing_time_ms", None)
-        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        proc_seconds_str = (
+            f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        )
         console.print(f"Processing time: {proc_seconds_str}")
         console.print()
         console.print("SUMMARY:")
@@ -320,7 +319,9 @@ def _display_summary(document: Document, result: Any, output_format: str) -> Non
         console.print(f"- **Format**: {document.format.value.upper()}")
         console.print(f"- **Size**: {document.size_bytes:,} bytes")
         proc_ms = getattr(result, "processing_time_ms", None)
-        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        proc_seconds_str = (
+            f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        )
         console.print(f"- **Processing time**: {proc_seconds_str}")
         console.print()
         console.print("## Summary")
@@ -363,7 +364,9 @@ def _save_summary(
 
 
 def _determine_output_path(
-    document: Document, output_format: str, output_path: str | None,
+    document: Document,
+    output_format: str,
+    output_path: str | None,
 ) -> Path:
     """Compute output file path based on format and user input."""
     if output_path:
@@ -395,7 +398,9 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
         content += f"- **Format**: {document.format.value.upper()}\n"
         content += f"- **Size**: {document.size_bytes:,} bytes\n"
         proc_ms = getattr(result, "processing_time_ms", None)
-        proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        proc_seconds_str = (
+            f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+        )
         content += f"- **Processing time**: {proc_seconds_str}\n\n"
         content += "## Summary\n\n"
         content += f"{result.summary}\n\n"
@@ -410,7 +415,9 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
     content += f"Format: {document.format.value.upper()}\n"
     content += f"Size: {document.size_bytes:,} bytes\n"
     proc_ms = getattr(result, "processing_time_ms", None)
-    proc_seconds_str = f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+    proc_seconds_str = (
+        f"{(proc_ms / 1000.0):.2f} seconds" if proc_ms is not None else "unknown"
+    )
     content += f"Processing time: {proc_seconds_str}\n\n"
     content += "SUMMARY:\n"
     content += f"{result.summary}\n\n"
@@ -421,7 +428,7 @@ def _format_summary_content(document: Document, result: Any, output_format: str)
     return content
 
 
-def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
+def _parse_with_progress(file_path: str) -> tuple[Document, str]:
     """Parse the document file with a progress indicator and return model+text."""
     with Progress(
         SpinnerColumn(),
@@ -441,6 +448,7 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
             if "unsupported" in msg or "unsupported file format" in msg:
                 err_msg = f"Unsupported file format: {e}"
                 from hlpr.config.ui_strings import UNSUPPORTED_FORMAT_SIMPLE
+
                 desc = UNSUPPORTED_FORMAT_SIMPLE.format(fmt=str(e))
                 progress.update(parse_task, completed=True, description=desc)
                 console.print(f"[red]Error:[/red] {err_msg}")
@@ -457,6 +465,7 @@ def _parse_with_progress(file_path: str, verbose: bool) -> tuple[Document, str]:
             if "unsupported" in msg or "unsupported file format" in msg:
                 err_msg = f"Unsupported file format: {e}"
                 from hlpr.config.ui_strings import UNSUPPORTED_FORMAT_SIMPLE
+
                 desc = UNSUPPORTED_FORMAT_SIMPLE.format(fmt=str(e))
                 progress.update(parse_task, completed=True, description=desc)
                 console.print(f"[red]Error:[/red] {err_msg}")
@@ -484,7 +493,6 @@ def _summarize_with_progress(
     chunk_size: int,
     chunk_overlap: int,
     chunking_strategy: str,
-    verbose: bool,
 ):
     """Generate summary with a progress indicator, using chunking when needed."""
     with Progress(
@@ -626,9 +634,7 @@ def summarize_meeting(
                 # Split by commas and parentheses
                 parts = line.split(":", 1)[1]
                 parts = parts.replace("(", "").replace(")", "")
-                participants = [
-                    p.strip() for p in parts.split(",") if p.strip()
-                ]
+                participants = [p.strip() for p in parts.split(",") if p.strip()]
                 break
 
         # Include provided metadata into the overview when present
@@ -675,9 +681,17 @@ def summarize_meeting(
 def summarize_guided(
     file_path: str = typer.Argument(..., help="Path to the document file to summarize"),
     provider: str = typer.Option("local", "--provider", help="AI provider to use"),
-    output_format: str = typer.Option("rich", "--format", help="Output format [txt|md|json|rich]"),
-    simulate_work: bool = typer.Option(False, help="Simulate work during the guided flow"),
-    execute: bool = typer.Option(True, "--execute/--no-execute", help="Run parse+summarization after prompts (default: interactive execute)"),
+    output_format: str = typer.Option(
+        "rich", "--format", help="Output format [txt|md|json|rich]"
+    ),
+    simulate_work: bool = typer.Option(
+        False, help="Simulate work during the guided flow"
+    ),
+    execute: bool = typer.Option(
+        True,
+        "--execute/--no-execute",
+        help="Run parse+summarization after prompts (default: interactive execute)",
+    ),
 ) -> None:
     """Run the guided interactive summarization flow.
 
@@ -701,7 +715,9 @@ def summarize_guided(
             # the real parse + summarization path. We avoid relying on the
             # simulation-only run_with_phases here so guided mode actually
             # performs processing when the user requests execution.
-            base_opts = session.collect_basic_options({"provider": provider, "format": output_format})
+            base_opts = session.collect_basic_options(
+                {"provider": provider, "format": output_format}
+            )
             opts = session.collect_advanced_options(base_opts, {})
 
             # Convert ProcessingOptions to plain dict for compatibility
@@ -714,7 +730,9 @@ def summarize_guided(
             from hlpr.config.ui_strings import PANEL_VALIDATION_ERROR
 
             if not path.exists() or not path.is_file():
-                display.show_error_panel(PANEL_VALIDATION_ERROR, FILE_NOT_FOUND.format(path=file_path))
+                display.show_error_panel(
+                    PANEL_VALIDATION_ERROR, FILE_NOT_FOUND.format(path=file_path)
+                )
                 raise typer.Exit(1)
 
             # Check file size for memory-efficient handling
@@ -727,14 +745,19 @@ def summarize_guided(
                     f"This file is {mb_size} MB, which exceeds the memory-efficient threshold ({threshold_mb} MB). "
                     "Parsing will use streaming mode to conserve memory, but processing may be slower. Continue?",
                     style="yellow",
-                    border_style="yellow"
+                    border_style="yellow",
                 )
                 if not typer.confirm("Continue with processing?", default=True):
-                    display.show_panel("Cancelled", "Operation cancelled by user.", style="red", border_style="red")
+                    display.show_panel(
+                        "Cancelled",
+                        "Operation cancelled by user.",
+                        style="red",
+                        border_style="red",
+                    )
                     raise typer.Exit(0)
 
             # Parse the document with progress
-            document, extracted_text = _parse_with_progress(file_path, verbose=True)
+            document, extracted_text = _parse_with_progress(file_path)
 
             # Build summarizer using options collected
             timeout_val = CONFIG.default_timeout
@@ -753,7 +776,6 @@ def summarize_guided(
                 opts_dict.get("chunk_size", 8192),
                 opts_dict.get("chunk_overlap", 256),
                 opts_dict.get("chunking_strategy", "sentence"),
-                verbose=True,
             )
 
             # Display summary using requested format
@@ -792,7 +814,10 @@ def summarize_guided(
         res = session.run_with_phases(file_path, options)
         if res.get("status") == "error":
             from hlpr.config.ui_strings import PANEL_COMMAND_TEMPLATE
-            display.show_error_panel(PANEL_COMMAND_TEMPLATE, res.get("message", "Unknown error"))
+
+            display.show_error_panel(
+                PANEL_COMMAND_TEMPLATE, res.get("message", "Unknown error")
+            )
             raise typer.Exit(1)
 
         # Display success
@@ -823,12 +848,20 @@ def summarize_guided(
 def summarize_documents(
     files: list[str] = typer.Argument(..., help="Files to summarize"),
     provider: str = typer.Option("local", "--provider", help="AI provider to use"),
-    format: OutputFormat = typer.Option(OutputFormat.RICH, "--format", help="Output format"),
+    format: OutputFormat = typer.Option(
+        OutputFormat.RICH, "--format", help="Output format"
+    ),
     concurrency: int = typer.Option(4, "--concurrency", help="Max concurrent workers"),
     partial_output: str | None = typer.Option(
-        None, "--partial-output", help="Path to write partial results JSON if run is interrupted",
+        None,
+        "--partial-output",
+        help="Path to write partial results JSON if run is interrupted",
     ),
-    summary_json: str | None = typer.Option(None, "--summary-json", help="Path to write machine-readable batch summary JSON (omit to print to stdout)"),
+    summary_json: str | None = typer.Option(
+        None,
+        "--summary-json",
+        help="Path to write machine-readable batch summary JSON (omit to print to stdout)",
+    ),
 ) -> None:
     """Summarize multiple documents concurrently.
 
@@ -874,7 +907,9 @@ def summarize_documents(
                 doc.extracted_text = text
 
                 if summarizer is None:
-                    return ProcessingResult(file=file_sel, summary=f"(stub) summary for {file_sel.path}")
+                    return ProcessingResult(
+                        file=file_sel, summary=f"(stub) summary for {file_sel.path}"
+                    )
 
                 result = summarizer.summarize_document(doc)
 
@@ -885,7 +920,7 @@ def summarize_documents(
                 meta = ProcessingMetadata()
                 proc_ms = getattr(result, "processing_time_ms", None)
                 if proc_ms is not None:
-                    meta.duration_seconds = (proc_ms / 1000.0)
+                    meta.duration_seconds = proc_ms / 1000.0
 
                 provider_name = getattr(result, "provider", None)
                 if provider_name:
@@ -914,7 +949,9 @@ def summarize_documents(
             except Exception as e:
                 return ProcessingResult(
                     file=file_sel,
-                    error=ProcessingError(message=str(e), details={"type": type(e).__name__}),
+                    error=ProcessingError(
+                        message=str(e), details={"type": type(e).__name__}
+                    ),
                 )
 
         return adapter
@@ -931,11 +968,17 @@ def summarize_documents(
     # Batch-level error summary for visibility
     error_results = [r for r in results if r.error]
     if error_results:
-        console.print(f"\n[yellow]Warning:[/yellow] {len(error_results)} file(s) failed to process")
+        console.print(
+            f"\n[yellow]Warning:[/yellow] {len(error_results)} file(s) failed to process"
+        )
         # Show up to three example failures with brief diagnostics and a hint
         for er in error_results[:3]:
             # Prefer structured code when available
-            code = getattr(er.error, "code", None) or er.error.details.get("type") if er.error.details else None
+            code = (
+                getattr(er.error, "code", None) or er.error.details.get("type")
+                if er.error.details
+                else None
+            )
             msg = (er.error.message or "Unknown error").strip()
             # Truncate long messages for terminal readability
             if len(msg) > 240:
@@ -948,13 +991,17 @@ def summarize_documents(
             console.print(
                 f"  [red]✗[/red] {er.file.path}: {msg}{details} {f'[code={code}]' if code else ''}",
             )
-            console.print(f"      Hint: run `hlpr summarize document {er.file.path}` to reproduce")
+            console.print(
+                f"      Hint: run `hlpr summarize document {er.file.path}` to reproduce"
+            )
         if len(error_results) > 3:
             console.print(f"  ... and {len(error_results) - 3} more errors")
 
     # Persist partial results if the run was interrupted and user requested a path
     if partial_output and getattr(processor, "interrupted", False):
-        console.print(f"[yellow]Run interrupted; saving partial results to {partial_output}[/yellow]")
+        console.print(
+            f"[yellow]Run interrupted; saving partial results to {partial_output}[/yellow]"
+        )
         jr = JsonRenderer()
         # Convert list of ProcessingResult pydantic models to serializable JSON
         json_text = jr.render(results)
@@ -1001,4 +1048,3 @@ def summarize_documents(
             except OSError:
                 # Best-effort fallback when atomic write cannot complete due to OS-level error
                 Path(summary_json).write_text(summary_text, encoding="utf-8")
-

@@ -295,9 +295,7 @@ class DSPyDocumentSummarizer:
         # newline-separated key points into a single merged string.
         if not any(bullet_re.match(raw) for raw in lines if raw):
             cleaned_simple = [
-                re.sub(r"\s+", " ", ln).strip()
-                for ln in lines
-                if ln and ln.strip()
+                re.sub(r"\s+", " ", ln).strip() for ln in lines if ln and ln.strip()
             ]
             return [ln for ln in cleaned_simple if ln]
 
@@ -305,7 +303,10 @@ class DSPyDocumentSummarizer:
             if not raw:
                 continue
             current, finished = DSPyDocumentSummarizer._merge_step(
-                current, raw, bullet_re, sentence_end_re,
+                current,
+                raw,
+                bullet_re,
+                sentence_end_re,
             )
             if finished:
                 items.append(finished)
@@ -430,6 +431,7 @@ class DSPyDocumentSummarizer:
         This extracts the ThreadPoolExecutor + retry logic from summarize()
         to reduce the parent method's cyclomatic complexity.
         """
+
         def _call_summarizer():
             return self._invoke_summarizer(text)
 
@@ -582,6 +584,7 @@ class DSPyDocumentSummarizer:
             }
 
         with ThreadPoolExecutor(max_workers=1) as executor:
+
             def _call_verifier():
                 return verifier(source_text=source_text, claim=claim)
 

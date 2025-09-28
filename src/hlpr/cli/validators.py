@@ -3,6 +3,7 @@
 These helpers return (is_valid, message). They perform filesystem checks and
 basic schema checks for CLI-provided configuration options.
 """
+
 import os
 from collections.abc import Iterable
 from pathlib import Path
@@ -73,15 +74,21 @@ def suggest_file_fixes(path: str) -> list[str]:
     p = Path(path)
     # Suggest adding common extensions if missing
     if not p.suffix:
-        suggestions.append(f"Try adding a common extension: '{path}.md' or '{path}.txt'")
+        suggestions.append(
+            f"Try adding a common extension: '{path}.md' or '{path}.txt'"
+        )
 
     # Suggest checking working directory when path looks relative
     if not p.is_absolute():
-        suggestions.append("Try using an absolute path or verify the current working directory (pwd)")
+        suggestions.append(
+            "Try using an absolute path or verify the current working directory (pwd)"
+        )
 
     # Suggest checking for common typos (simple heuristic)
     if path.count(" ") > 0:
-        suggestions.append("Paths with spaces may need quoting; try '" + path + "' or escape spaces")
+        suggestions.append(
+            "Paths with spaces may need quoting; try '" + path + "' or escape spaces"
+        )
 
     return suggestions
 
@@ -114,12 +121,15 @@ def validate_config(
 
     for key in required_keys:
         if key not in options:
-            return False, MISSING_REQUIRED_TEMPLATE.format(key=key, arg=key.replace("_", "-") or key)
+            return False, MISSING_REQUIRED_TEMPLATE.format(
+                key=key, arg=key.replace("_", "-") or key
+            )
 
     provider = options.get("provider")
     if provider not in allowed_providers:
         allowed = ", ".join(allowed_providers)
         from hlpr.config.ui_strings import UNSUPPORTED_PROVIDER_TEMPLATE
+
         # Include lowercase token 'unsupported provider' for tests.
         msg = UNSUPPORTED_PROVIDER_TEMPLATE.format(provider=provider, allowed=allowed)
         return False, msg + " | unsupported provider"
@@ -134,7 +144,9 @@ def validate_config(
     return True, "ok"
 
 
-def resolve_config_conflicts(options: dict[str, object]) -> tuple[dict[str, object], list[str]]:
+def resolve_config_conflicts(
+    options: dict[str, object],
+) -> tuple[dict[str, object], list[str]]:
     """Detect and resolve simple configuration conflicts.
 
     Returns a tuple of (resolved_options, warnings). This resolver handles a
@@ -149,7 +161,9 @@ def resolve_config_conflicts(options: dict[str, object]) -> tuple[dict[str, obje
     fmt = resolved.get("output_format")
     if provider == "local" and fmt == "rich":
         # local provider might not support rich rendering in headless contexts
-        warnings.append("'local' provider may not support 'rich' output in headless environments; falling back to 'txt'")
+        warnings.append(
+            "'local' provider may not support 'rich' output in headless environments; falling back to 'txt'"
+        )
         resolved["output_format"] = "txt"
 
     # Normalize boolean flags that may be provided as strings

@@ -4,6 +4,7 @@ Provides a small Typer sub-app for listing, showing, deleting, and saving
 templates. This is intentionally minimal to support integration tests and
 future UX enhancements.
 """
+
 from __future__ import annotations
 
 from datetime import UTC
@@ -29,7 +30,9 @@ def list_templates() -> None:
 
 
 @app.command("show")
-def show_template(template_id: str | None = typer.Argument(None, help="Template id to show")) -> None:
+def show_template(
+    template_id: str | None = typer.Argument(None, help="Template id to show"),
+) -> None:
     """Show a saved template by id.
 
     If no TEMPLATE_ID is provided, list available templates and prompt the
@@ -79,7 +82,9 @@ def show_template(template_id: str | None = typer.Argument(None, help="Template 
                     idx = default_choice - 1
                     break
                 if not (min_choice <= int(choice) <= max_choice):
-                    console.print(f"💩 Number must be between {min_choice} and {max_choice}")
+                    console.print(
+                        f"💩 Number must be between {min_choice} and {max_choice}"
+                    )
                     continue
                 idx = int(choice) - 1
                 break
@@ -117,7 +122,9 @@ def delete_template(template_id: str) -> None:
 
 
 @app.command("save")
-def save_template(command: str, name_: str | None = None) -> None:  # name_ optional user-provided id
+def save_template(
+    command: str, name_: str | None = None
+) -> None:  # name_ optional user-provided id
     """Save a raw command string as a template.
 
     If a name is supplied it will be used as the template id; otherwise
@@ -125,8 +132,11 @@ def save_template(command: str, name_: str | None = None) -> None:  # name_ opti
     """
     store = SavedCommands()
     from datetime import datetime
+
     tmpl_id = name_ or f"cmd_{int(datetime.now(UTC).timestamp())}"
-    tmpl = CommandTemplate.from_options(id=tmpl_id, command_template=command, options={})
+    tmpl = CommandTemplate.from_options(
+        id=tmpl_id, command_template=command, options={}
+    )
     try:
         store.save_command(tmpl)
         typer.echo(f"Saved template {tmpl.id}")

@@ -1,5 +1,3 @@
-
-
 def test_cli_error_handling_exit_codes():
     """T007: Contract test for error handling and proper exit codes.
 

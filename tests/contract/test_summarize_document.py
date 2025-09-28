@@ -80,10 +80,12 @@ class TestSummarizeDocumentContract:
 
     def test_summarize_document_unsupported_format(self):
         """Test handling of unsupported file formats"""
+
     # This would test file validation, but since endpoint doesn't exist,
     # it will fail (placeholder for future implementation)
 
     def test_summarize_document_file_too_large(self):
         """Test handling of files that are too large"""
+
     # This would test file size limits, but since endpoint doesn't exist,
     # it will fail (placeholder for future implementation)

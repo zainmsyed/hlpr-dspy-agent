@@ -174,7 +174,8 @@ class TestCliEmailAccountsContract:
         if result1.exit_code == 0:
             # Then test connection
             result2 = runner.invoke(
-                app, ["email", "accounts", "test", "test_conn"],
+                app,
+                ["email", "accounts", "test", "test_conn"],
             )
             # Connection test may succeed or fail depending on credentials
             assert result2.exit_code in [0, 1, 3]

@@ -8,8 +8,11 @@ from hlpr.llm.dspy_integration import DSPyDocumentSummarizer
 
 def test_result_from_future_timeout_raises_summarization_error():
     summarizer = DSPyDocumentSummarizer(
-        provider="local", timeout=0.01, fast_fail_seconds=0.0,
+        provider="local",
+        timeout=0.01,
+        fast_fail_seconds=0.0,
     )
+
     # Create a dummy future whose result() raises SummarizationError so the
     # behavior is deterministic across environments and doesn't block the
     # test runner waiting on a real Future that never completes.

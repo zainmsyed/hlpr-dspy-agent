@@ -39,6 +39,7 @@ class TestCliEmailProcessContract:
         assert result.exit_code in [1, 2]  # Will fail due to missing account/config
         # This would test IMAP auth failures, but since endpoint doesn't exist,
         # it will fail (placeholder for future implementation)
+
     def test_email_process_with_date_filter(self):
         """Test email processing with since date filter"""
         result = runner.invoke(

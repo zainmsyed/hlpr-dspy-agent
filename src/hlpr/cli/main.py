@@ -67,6 +67,7 @@ def file_picker_command() -> None:
     missing module `hlpr.cli.file_picker`.
     """
     from rich.console import Console
+
     console = Console()
     console.print("The interactive file picker has been removed from this build.")
     # Previously: from hlpr.cli.file_picker import main as fp_main

@@ -80,7 +80,9 @@ def process_emails(
     unread_only: bool = typer.Option(default=False, help="Only unread"),
     limit: int | None = typer.Option(None, "--limit"),
     output_options: str = typer.Option(
-        "txt:", "--output", help="Output format:path (e.g., txt:file.txt)",
+        "txt:",
+        "--output",
+        help="Output format:path (e.g., txt:file.txt)",
     ),
 ) -> NoReturn:
     """Process emails from specified account."""
