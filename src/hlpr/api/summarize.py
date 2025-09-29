@@ -21,10 +21,13 @@ from hlpr.exceptions import (
     ConfigurationError,
     DocumentProcessingError,
     HlprError,
+    StorageError,
     SummarizationError,
 )
+from hlpr.io.atomic import atomic_write_text
 from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
+from hlpr.models.output_preferences import OutputPreferences
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -50,6 +53,12 @@ class DocumentSummaryResponse(BaseModel):
         description="AI provider that generated the summary",
     )
     format: str = Field(..., description="Response format")
+    storage_info: dict | None = Field(
+        None,
+        description=(
+            "Optional storage metadata when saved to disk"
+        ),
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -99,15 +108,11 @@ def _raise_http(status_code: int, error: ErrorResponse) -> None:
     raise HTTPException(status_code=status_code, detail=detail)
 
 
-def _process_file_upload(
-    *,
-    filename: str,
-    file_content: bytes,
-    provider_id: str | None,
-    temperature: float | None,
-    start_time: float,
-) -> DocumentSummaryResponse:
-    """Handle uploaded file processing and summarization."""
+def _validate_file_upload(filename: str, file_content: bytes) -> tuple[str, int]:
+    """Validate filename extension and size; raise HTTP on invalid input.
+
+    Returns (extension, file_size).
+    """
     file_path = Path(filename)
     extension = file_path.suffix.lower().lstrip(".")
     if extension not in ["pdf", "docx", "txt", "md"]:
@@ -144,52 +149,130 @@ def _process_file_upload(
     if file_size == 0:
         _raise_http(
             status.HTTP_400_BAD_REQUEST,
-            ErrorResponse(
-                error="Uploaded file is empty",
-                error_code="EMPTY_FILE",
-            ),
+            ErrorResponse(error="Uploaded file is empty", error_code="EMPTY_FILE"),
         )
+
+    return extension, file_size
+
+
+def _write_temp_and_parse(
+    file_content: bytes,
+    extension: str,
+) -> tuple[Document, str, Path]:
+    """Write file_content to a secure temp file and parse into Document.
+
+    Returns (document, extracted_text, temp_dir_path).
+    """
+    temp_dir = Path(tempfile.mkdtemp(prefix="hlpr_upload_"))
+    temp_file_path = temp_dir / f"upload_{uuid4().hex}.{extension}"
+    with temp_file_path.open("wb") as temp_file:
+        temp_file.write(file_content)
+
+    extracted_text = DocumentParser.parse_file(str(temp_file_path))
+    document = Document.from_file(str(temp_file_path))
+    document.extracted_text = extracted_text
+    return document, extracted_text, temp_dir
+
+
+def _persist_summary(
+    filename: str,
+    resp: DocumentSummaryResponse,
+    format_param: str | None,
+    save_min_free_bytes: int | None,
+) -> tuple[Path, str]:
+    """Persist a generated summary to organized storage and return (path, fmt)."""
+    prefs = OutputPreferences()
+    if save_min_free_bytes is not None:
+        prefs.min_free_bytes = save_min_free_bytes
+
+    storage = prefs.to_organized_storage()
+    storage.ensure_directory_exists()
+
+    save_fmt = format_param or "json"
+    target = storage.get_organized_path(filename, save_fmt)
+
+    if save_fmt == "json":
+        content = safe_serialize(resp.model_dump())
+    elif save_fmt == "md":
+        content = f"# Document Summary: {filename}\n\n{resp.summary}\n"
+    else:
+        content = str(resp.summary)
+
+    # Prefer atomic write; gracefully fall back to a normal write only
+    try:
+        atomic_write_text(str(target), content)
+    except FileNotFoundError:
+        storage.ensure_directory_exists()
+        atomic_write_text(str(target), content)
+    except OSError:
+        # Fallback plain write; if it fails raise StorageError
+        try:
+            Path(target).write_text(content, encoding="utf-8")
+        except OSError as fallback_err:
+            raise StorageError(
+                message=f"Failed to persist summary to {target}",
+                details={"path": str(target)},
+            ) from fallback_err
+
+    return target, save_fmt
+
+
+def _summarize_parsed_document(
+    document: Document,
+    extracted_text: str,
+    provider_id: str | None,
+    temperature: float | None,
+    start_time: float,
+) -> tuple[object, int, int]:
+    """Run summarizer and return (result, word_count, processing_time_ms)."""
+    summarizer = DocumentSummarizer(
+        provider=provider_id or "local",
+        temperature=temperature if temperature is not None else 0.3,
+    )
+
+    if len(extracted_text) > 8192:
+        result = summarizer.summarize_large_document(
+            document, chunking_strategy="sentence"
+        )
+    else:
+        result = summarizer.summarize_document(document)
+
+    word_count = len(extracted_text.split())
+    processing_time_ms = int((time.time() - start_time) * 1000)
+    return result, word_count, processing_time_ms
+
+
+def _process_file_upload(
+    *,
+    filename: str,
+    file_content: bytes,
+    provider_id: str | None,
+    temperature: float | None,
+    start_time: float,
+    format_param: str | None = "json",
+    save: bool = False,
+    save_min_free_bytes: int | None = None,
+) -> DocumentSummaryResponse:
+    """Handle uploaded file processing and summarization."""
+    extension, _file_size = _validate_file_upload(filename, file_content)
 
     temp_dir = None
-    temp_file_path = None
     try:
-        # Create secure temporary directory
-        temp_dir = tempfile.mkdtemp(prefix="hlpr_upload_")
-        temp_file_path = Path(temp_dir) / f"upload_{uuid4().hex}.{extension}"
-
-        # Write uploaded content to secure temp file
-        with temp_file_path.open("wb") as temp_file:
-            temp_file.write(file_content)
-
-        # Parse document
-        extracted_text = DocumentParser.parse_file(str(temp_file_path))
-
-        # Create document model
-        document = Document.from_file(str(temp_file_path))
-        document.extracted_text = extracted_text
-
-        # Initialize summarizer (respect optional temperature)
-        summarizer = DocumentSummarizer(
-            provider=provider_id or "local",
-            temperature=temperature if temperature is not None else 0.3,
+        # Write to a secure temp file and parse into a Document
+        document, extracted_text, temp_dir = _write_temp_and_parse(
+            file_content,
+            extension,
         )
 
-        # Generate summary
-        if len(extracted_text) > 8192:
-            result = summarizer.summarize_large_document(
-                document,
-                chunking_strategy="sentence",
-            )
-        else:
-            result = summarizer.summarize_document(document)
-
-        word_count = len(extracted_text.split())
-        processing_time_ms = int((time.time() - start_time) * 1000)
+        # Summarize the parsed document
+        result, word_count, processing_time_ms = _summarize_parsed_document(
+            document, extracted_text, provider_id, temperature, start_time
+        )
 
         # Defensive: sanitize all values coming from the summarizer to ensure
         # no third-party library objects (LLM internals) are passed into
         # Pydantic models which may trigger serializer warnings.
-        return DocumentSummaryResponse(
+        resp = DocumentSummaryResponse(
             id=str(uuid4()),
             summary=safe_serialize(result.summary),
             key_points=safe_serialize(result.key_points),
@@ -198,6 +281,18 @@ def _process_file_upload(
             provider_used=provider_id or "local",
             format="json",
         )
+
+        # Optionally persist the generated summary to organized storage
+        if save:
+            target, save_fmt = _persist_summary(
+                filename=filename,
+                resp=resp,
+                format_param=format_param,
+                save_min_free_bytes=save_min_free_bytes,
+            )
+            resp.storage_info = {"path": str(target), "format": save_fmt}
+
+        return resp
     finally:
         # Clean up temporary directory securely
         try:
@@ -361,12 +456,39 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
                 "Received document upload",
                 extra=build_safe_extra(log_ctx, **file_extra),
             )
+            # Read optional save flags from query params
+            def _parse_bool(value: str | None) -> bool:
+                if value is None:
+                    return False
+                return value.lower() in {"1", "true", "yes", "on"}
+
+            raw_save = request.query_params.get("save")
+            raw_min_free = request.query_params.get("save_min_free_mb")
+            save_flag = _parse_bool(raw_save)
+            save_min = None
+            if raw_min_free is not None:
+                try:
+                    save_min = max(0, int(raw_min_free)) * 1024 * 1024
+                except ValueError as ve:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=safe_serialize(
+                            ErrorResponse(
+                                error="save_min_free_mb must be an integer",
+                                error_code="INVALID_SAVE_MIN_FREE_MB",
+                            ).model_dump()
+                        ),
+                    ) from ve
+
             resp = _process_file_upload(
                 filename=file.filename,
                 file_content=file_content,
                 provider_id=provider_id,
                 temperature=temperature,
                 start_time=start_time,
+                format_param=format_param,
+                save=save_flag,
+                save_min_free_bytes=save_min,
             )
             logger.info(
                 "File processed successfully",
@@ -457,6 +579,8 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
             status_code = status.HTTP_400_BAD_REQUEST
         elif isinstance(he, SummarizationError):
             status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        elif isinstance(he, StorageError):
+            status_code = he.status_code()
         elif isinstance(he, ConfigurationError):
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         else:

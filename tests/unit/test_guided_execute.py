@@ -16,15 +16,8 @@ def test_guided_execute_runs_parse_and_summarize(tmp_path, monkeypatch):
         doc = Document.from_file(str(path))
         return doc, "extracted text"
 
-    def fake_summarize(
-        summarizer,
-        document,
-        extracted_text,
-        chunk_size,
-        chunk_overlap,
-        chunking_strategy,
-        verbose,
-    ):
+    def fake_summarize(*args, **kwargs):
+        # Accept flexible signature to mirror the real summarizer wrapper
         calls["summarize"] = True
         return types.SimpleNamespace(summary="ok", key_points=[], processing_time_ms=1)
 

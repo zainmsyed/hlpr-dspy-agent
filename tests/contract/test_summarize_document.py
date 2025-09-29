@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from hlpr.api.main import app
+from hlpr.models.output_preferences import OutputPreferences
 
 client = TestClient(app)
 
@@ -89,3 +90,57 @@ class TestSummarizeDocumentContract:
 
     # This would test file size limits, but since endpoint doesn't exist,
     # it will fail (placeholder for future implementation)
+
+    def test_summarize_document_save_success(self, tmp_path, monkeypatch):
+        test_file = tmp_path / "needs_saving.md"
+        test_file.write_text("Simple text content for summarization.")
+
+        monkeypatch.setattr(OutputPreferences, "effective_base", lambda _: tmp_path)
+
+        with test_file.open("rb") as f:
+            response = client.post(
+                "/summarize/document?save=1&format_param=md",
+                files={"file": (test_file.name, f, "text/markdown")},
+                data={"provider_id": "local"},
+            )
+
+        assert response.status_code == HTTP_200_OK
+        body = response.json()
+        assert body.get("storage_info") is not None
+        saved_path = Path(body["storage_info"]["path"])
+        assert saved_path.exists()
+        assert saved_path.read_text(encoding="utf-8").strip() != ""
+        saved_path.unlink(missing_ok=True)
+
+    def test_summarize_document_storage_error_returns_507(self, tmp_path, monkeypatch):
+        test_file = tmp_path / "denied.txt"
+        test_file.write_text("Content for storage failure path.")
+
+        monkeypatch.setattr(OutputPreferences, "effective_base", lambda _: tmp_path)
+
+        def fake_atomic_write(*args, **kwargs):
+            raise PermissionError("atomic write denied")
+
+        monkeypatch.setattr("hlpr.api.summarize.atomic_write_text", fake_atomic_write)
+
+        original_write_text = Path.write_text
+
+        def fake_write_text(self, content, encoding="utf-8"):
+            if str(self).startswith(str(tmp_path)):
+                raise PermissionError("fallback denied")
+            return original_write_text(self, content, encoding=encoding)
+
+        monkeypatch.setattr(Path, "write_text", fake_write_text)
+
+        with test_file.open("rb") as f:
+            response = client.post(
+                "/summarize/document?save=1",
+                files={"file": (test_file.name, f, "text/plain")},
+                data={"provider_id": "local"},
+            )
+
+        assert response.status_code == 507
+        payload = response.json()
+        detail = payload.get("detail") or {}
+        assert detail.get("error_code") == "STORAGE_ERROR"
+        assert "path" in (detail.get("details") or {})

@@ -32,6 +32,8 @@ if os.path.exists(_legacy_path):
         HlprError = _mod.HlprError
         ValidationError = _mod.ValidationError
         ConfigurationError = _mod.ConfigurationError
+        # New storage-related error from the legacy module
+        StorageError = getattr(_mod, "StorageError", None)
     except AttributeError:
         # If something is missing, avoid raising during import; modules
         # that rely on these names will surface a clearer error when used.
@@ -51,6 +53,7 @@ __all__ = [
     "ConfigurationError",
     "DocumentProcessingError",
     "HlprError",
+    "StorageError",
     "SummarizationError",
     "ValidationError",
 ]

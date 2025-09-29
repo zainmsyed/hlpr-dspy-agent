@@ -42,11 +42,13 @@ from hlpr.exceptions import (
     ConfigurationError,
     DocumentProcessingError,
     HlprError,
+    StorageError,
     SummarizationError,
 )
 from hlpr.io.atomic import atomic_write_text
 from hlpr.logging_utils import build_extra, build_safe_extra, new_context
 from hlpr.models.document import Document
+from hlpr.models.output_preferences import OutputPreferences
 from hlpr.models.saved_commands import SavedCommands
 
 logger = logging.getLogger(__name__)
@@ -122,6 +124,10 @@ def summarize_document(
         default=False,
         help="Verify flagged hallucinations with additional model calls",
     ),
+    min_free_mb: int | None = typer.Option(
+        None,
+        help="Minimum free MiB required on the target filesystem when saving to organized storage (overrides config)",
+    ),
 ):
     """Summarize a document (PDF, DOCX, TXT, MD)."""
     # Validate file exists (outside try to avoid TRY301)
@@ -188,8 +194,17 @@ def summarize_document(
 
         # Save to file if requested
         if save:
-            output_path = _save_summary(document, result, output_format, output)
-            console.print(f"\n[green]Summary saved to:[/green] {output_path}")
+            try:
+                # Build preferences with optional override from CLI
+                prefs = OutputPreferences()
+                if min_free_mb is not None:
+                    prefs.min_free_bytes = int(min_free_mb) * 1024 * 1024
+
+                output_path = _save_summary(document, result, output_format, output, prefs)
+                console.print(f"\n[green]Summary saved to:[/green] {output_path}")
+            except StorageError as se:
+                console.print(f"[red]Storage error:[/red] {se}")
+                raise typer.Exit(7) from se
 
     except typer.Exit:
         raise
@@ -345,25 +360,56 @@ def _save_summary(
     result: Any,
     output_format: str,
     output_path: str | None,
+    prefs: OutputPreferences | None = None,
 ) -> str:
     """Save the summary to a file."""
-    save_path = _determine_output_path(document, output_format, output_path)
+    # Use preferences to decide organized storage behavior
+    prefs = prefs or OutputPreferences()
 
-    # Ensure parent directory exists
-    save_path.parent.mkdir(parents=True, exist_ok=True)
+    # Determine file format for saved file: prefer markdown when saving by default
+    save_format = output_format if output_format != "rich" else prefs.default_summary_format
 
-    # Ensure we don't overwrite without warning
-    if save_path.exists():
-        warn_msg = f"Overwriting existing file: {save_path}"
-        console.print(f"[yellow]Warning:[/yellow] {warn_msg}")
+    # If user provided an explicit output path, keep behavior (bypass organized storage)
+    if output_path:
+        save_path = Path(output_path)
+        # ensure parent exists
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        if save_path.exists():
+            console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {save_path}")
+        content = _format_summary_content(document, result, save_format)
+        save_path.write_text(content, encoding="utf-8")
+        return str(save_path)
 
-    content = _format_summary_content(document, result, output_format)
+    # Otherwise use organized storage (respect preferences)
+    storage = prefs.to_organized_storage()
+    target = storage.get_organized_path(document.path, save_format)
+    storage.ensure_directory_exists()
 
-    # Write to file
-    with save_path.open("w", encoding="utf-8") as f:
-        f.write(content)
+    if target.exists():
+        console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {target}")
 
-    return str(save_path)
+    content = _format_summary_content(document, result, save_format)
+    # Write atomically when possible
+    try:
+        atomic_write_text(str(target), content)
+    except FileNotFoundError:
+        # Directory may have been removed between ensure and write; recreate once.
+        storage.ensure_directory_exists()
+        atomic_write_text(str(target), content)
+    except Exception:
+        # Fallback best-effort write; re-raise if this fails as well.
+        try:
+            target.write_text(content, encoding="utf-8")
+        except Exception as write_error:
+            raise StorageError(message=f"Failed to write summary to {target}", details={"path": str(target)}) from write_error
+
+    # Optionally return metadata (currently returning path for CLI display)
+    # We return the path; avoid assigning unused metadata to satisfy linters.
+
+    return str(target)
+
+
+    return str(target)
 
 
 def _determine_output_path(
@@ -372,19 +418,16 @@ def _determine_output_path(
     output_path: str | None,
 ) -> Path:
     """Compute output file path based on format and user input."""
+    # Note: this helper is kept for non-save usages; saved-files prefer OrganizedStorage
     if output_path:
         return Path(output_path)
 
-    # Create hlpr/summaries/documents directory structure
-    summaries_dir = Path("hlpr/summaries/documents")
-    summaries_dir.mkdir(parents=True, exist_ok=True)
-
     doc_name = Path(document.path).stem
     if output_format == "json":
-        return summaries_dir / f"{doc_name}_summary.json"
+        return Path(f"{doc_name}_summary.json")
     if output_format == "md":
-        return summaries_dir / f"{doc_name}_summary.md"
-    return summaries_dir / f"{doc_name}_summary.txt"
+        return Path(f"{doc_name}_summary.md")
+    return Path(f"{doc_name}_summary.txt")
 
 
 def _format_summary_content(document: Document, result: Any, output_format: str) -> str:

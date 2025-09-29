@@ -248,7 +248,7 @@ Each spec directory contains:
 
 ## ❓ Questions?
 
-If you're a junior developer working on this codebase and have questions:
+If you're working on this codebase and have questions:
 
 1. **Check the tests** - They often show how components are meant to be used
 2. **Look at similar code** - Find existing patterns to follow

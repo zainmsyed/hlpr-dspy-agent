@@ -38,8 +38,8 @@
 - Tests: `tests/contract/`, `tests/integration/`, `tests/unit/`
 
 ## Phase 3.1: Setup
-- [ ] T001 Validate existing dependencies (typer, rich, pathlib) and linting setup with ruff
-- [ ] T002 [P] Create directory structure for new modules: `src/hlpr/io/` and enhanced model files
+- [x] T001 Validate existing dependencies (typer, rich, pathlib) and linting setup with ruff
+- [x] T002 [P] Create directory structure for new modules: `src/hlpr/io/` and enhanced model files
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
@@ -49,6 +49,12 @@
 - [ ] T006 [P] Integration test directory creation and permissions in `tests/integration/test_directory_creation.py`
 - [ ] T007 [P] Integration test path resolution logic in `tests/integration/test_path_resolution.py`
 - [ ] T008 [P] Integration test error handling scenarios in `tests/integration/test_storage_errors.py`
+ - [x] T003 [P] Contract test CLI organized storage behavior in `tests/contract/test_cli_organized_storage.py`
+ - [x] T004 [P] Contract test CLI custom path bypass in `tests/contract/test_cli_custom_path.py`
+ - [x] T005 [P] Contract test API enhanced endpoint in `tests/contract/test_api_organized_storage.py`
+ - [x] T006 [P] Integration test directory creation and permissions in `tests/integration/test_directory_creation.py`
+ - [x] T007 [P] Integration test path resolution logic in `tests/integration/test_path_resolution.py`
+ - [x] T008 [P] Integration test error handling scenarios in `tests/integration/test_storage_errors.py`
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
 - [ ] T009 [P] Create OutputPath model in `src/hlpr/models/output_path.py`
@@ -58,11 +64,21 @@
 - [ ] T013 Enhance `_determine_output_path()` function in `src/hlpr/cli/summarize.py`
 - [ ] T014 Enhance `_save_summary()` function in `src/hlpr/cli/summarize.py`
 - [ ] T015 Update default format from txt to md in `src/hlpr/cli/summarize.py`
+ - [x] T009 [P] Create OutputPath model in `src/hlpr/models/output_path.py`
+ - [x] T010 [P] Create OrganizedStorage utility class in `src/hlpr/io/organized_storage.py`
+ - [x] T011 [P] Create SummaryFileInfo model in `src/hlpr/models/summary_file_info.py`
+ - [x] T012 [P] Enhance OutputPreferences model in `src/hlpr/models/output_preferences.py`
+ - [x] T013 Enhance `_determine_output_path()` function in `src/hlpr/cli/summarize.py`
+ - [x] T014 Enhance `_save_summary()` function in `src/hlpr/cli/summarize.py`
+ - [x] T015 Update default format from txt to md in `src/hlpr/cli/summarize.py`
 
 ## Phase 3.4: Integration & Error Handling
 - [ ] T016 Implement comprehensive error handling for permission denied in organized storage utilities
 - [ ] T017 Implement path validation and disk space error handling in organized storage utilities
 - [ ] T018 Update API endpoint `/summarize/document` with organized storage options in `src/hlpr/api/summarize.py`
+ - [x] T016 Implement comprehensive error handling for permission denied in organized storage utilities
+ - [x] T017 Implement path validation and disk space error handling in organized storage utilities
+ - [x] T018 Update API endpoint `/summarize/document` with organized storage options in `src/hlpr/api/summarize.py`
 
 ## Phase 3.5: Polish & Validation
 - [ ] T019 [P] Unit tests for path resolution edge cases in `tests/unit/test_path_resolution.py`

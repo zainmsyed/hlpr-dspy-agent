@@ -10,7 +10,6 @@ from pathlib import Path
 
 from hlpr.config.ui_strings import (
     ACCESS_COULD_NOT_BE_DETERMINED,
-    EMPTY_PATH_MSG,
     FILE_NOT_FOUND,
     FILE_NOT_FOUND_NO_EXT,
     FILE_NOT_READABLE,
@@ -38,8 +37,8 @@ def validate_file_path(path: str) -> tuple[bool, str]:
     next steps where possible (e.g., suggest checking cwd, adding extension).
     """
     if not isinstance(path, str) or not path:
-        # Ensure test substring 'empty' (lowercase) is present.
-        return False, f"{EMPTY_PATH_MSG} (empty)"
+        # Return legacy short token expected by contract tests.
+        return False, "empty path"
 
     p = Path(path)
     if not p.exists():

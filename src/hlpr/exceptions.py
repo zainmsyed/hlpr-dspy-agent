@@ -72,3 +72,13 @@ class ConfigurationError(HlprError):
 
     def status_code(self) -> int:
         return status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@dataclass
+class StorageError(HlprError):
+    """Raised for filesystem/storage related errors (permissions, disk space)."""
+
+    code: str = "STORAGE_ERROR"
+
+    def status_code(self) -> int:
+        return status.HTTP_507_INSUFFICIENT_STORAGE
