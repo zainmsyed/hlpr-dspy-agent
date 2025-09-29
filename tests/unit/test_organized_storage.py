@@ -1,3 +1,47 @@
+import os
+import stat
+import shutil
+from pathlib import Path
+
+import pytest
+
+from hlpr.io.organized_storage import OrganizedStorage
+from hlpr.exceptions import StorageError
+
+
+def test_ensure_directory_creates_base(tmp_path):
+    storage = OrganizedStorage(base_directory=tmp_path)
+    base = storage.get_organized_base()
+    assert not base.exists()
+    created = storage.ensure_directory_exists()
+    assert created.exists()
+    assert created == base
+
+
+def test_permission_error_raises(tmp_path):
+    # Create a directory and remove write permissions to simulate permission error
+    protected = tmp_path / "protected_base"
+    protected.mkdir()
+    # Remove write permissions for owner
+    protected.chmod(stat.S_IREAD)
+
+    storage = OrganizedStorage(base_directory=protected.parent, summaries_folder=str(protected.name))
+
+    try:
+        with pytest.raises(StorageError):
+            storage.ensure_directory_exists()
+    finally:
+        # Restore permissions so pytest can clean up the tmpdir
+        protected.chmod(stat.S_IRWXU)
+
+
+def test_min_free_bytes_check(tmp_path, monkeypatch):
+    storage = OrganizedStorage(base_directory=tmp_path)
+    # Force an extremely large min_free_bytes to trigger insufficient space
+    storage.min_free_bytes = 10 ** 18
+
+    with pytest.raises(StorageError):
+        storage.ensure_directory_exists()
 import re
 import shutil
 from pathlib import Path

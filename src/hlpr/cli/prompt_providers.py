@@ -4,6 +4,14 @@ Defines a PromptProvider protocol and two implementations:
 - DefaultPromptProvider: wraps the test-friendly OptionPrompts
 - InteractivePromptProvider: uses simple input() prompts (safe fallback)
 
+Notes:
+- When the CLI saves summaries (via `--save`), it will by default write
+    files into an organized folder at `summaries/documents/` relative
+    to the current working directory unless an explicit `--output` path is
+    provided.
+- When saving and no explicit `--format` is provided, the CLI uses
+    Markdown (`.md`) as the default saved format.
+
 InteractiveSession will accept a PromptProvider via DI so the UI can be
 swapped for tests or an interactive runtime implementation that uses
 Rich/Typer later.
@@ -105,7 +113,8 @@ class InteractivePromptProvider:
                 return candidate
             typer.echo(f"Invalid format: {msg}")
             self._help.show_format_help()
-        typer.echo(f"Max attempts exceeded, using default format: {default}")
+        # fallback after attempts exhausted
+        typer.echo(f"Max attempts exceeded, using default format: {default} (when saving defaults to md)")
         return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:
@@ -195,7 +204,7 @@ class RichTyperPromptProvider:
             self.console.print(f"[red]Invalid format:[/red] {msg}")
             self._help.show_format_help()
         self.console.print(
-            f"[yellow]Max attempts exceeded, using default format:[/yellow] {default}"
+            f"[yellow]Max attempts exceeded, using default format:[/yellow] {default} (when saving defaults to md)"
         )
         return default
 

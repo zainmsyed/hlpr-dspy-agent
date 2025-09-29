@@ -93,6 +93,11 @@ hlpr summarize guided documents/examples/welcome_to_wrtr.md --provider local --f
 # Save output to a file (auto filename or explicit path)
 hlpr summarize document test_document.txt --save --format md
 hlpr summarize document test_document.txt --save --output my_summary.json --format json
+
+Note: When using `--save` without `--output`, hlpr will create an organized
+folder `summaries/documents/` in the current working directory and write
+the summary there. By default saved summaries use Markdown (`.md`) unless you
+specify `--format`.
 ```
 
 ## Notes for local development

@@ -5,6 +5,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid4
+import os
 
 from hlpr.config.storage import (
     DEFAULT_MIN_FREE_BYTES,
@@ -19,7 +20,11 @@ SAFE_FILENAME_REGEX = re.compile(SAFE_FILENAME_PATTERN)
 @dataclass
 class OrganizedStorage:
     base_directory: Path = field(default_factory=Path.cwd)
-    summaries_folder: str = "hlpr/summaries/documents"
+    # Store summaries under the repository root by default to avoid
+    # creating a nested `hlpr/hlpr/summaries/...` path when the project
+    # root already contains the package directory. This places saved
+    # summaries at <repo-root>/summaries/documents by default.
+    summaries_folder: str = "summaries/documents"
     default_format: str = "md"
     create_missing_dirs: bool = True
     # minimum free bytes required to consider storage usable (None disables check)
@@ -70,6 +75,20 @@ class OrganizedStorage:
                 message="OS error creating storage directory",
                 details={"path": str(base), "error": str(e)},
             ) from e
+
+        # Ensure the base directory is writable by the current process
+        try:
+            if not os.access(str(base), os.W_OK):
+                raise StorageError(
+                    message="Permission denied: storage directory is not writable",
+                    details={"path": str(base)},
+                )
+        except OSError:
+            # If os.access fails for some reason, raise a generic storage error
+            raise StorageError(
+                message="Failed to validate storage directory permissions",
+                details={"path": str(base)},
+            )
 
         # Disk space check: honor min_free_bytes if set
         if self.min_free_bytes is not None:

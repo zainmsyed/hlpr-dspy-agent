@@ -75,7 +75,7 @@ def summarize_document(
     output_format: str = typer.Option(
         "rich",
         "--format",
-        help="Output format [txt|md|json|rich]",
+        help="Output format [txt|md|json|rich] (when saving defaults to md)",
     ),
     output: str | None = typer.Option(
         None,
@@ -366,50 +366,47 @@ def _save_summary(
     # Use preferences to decide organized storage behavior
     prefs = prefs or OutputPreferences()
 
+    def _write_summary_atomic(path: Path, content: str) -> str:
+        """Write content atomically to path, printing overwrite warning when needed.
+
+        Returns path as string on success or raises StorageError on failure.
+        """
+        try:
+            if path.exists():
+                console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {path}")
+            atomic_write_text(str(path), content)
+            return str(path)
+        except Exception:
+            # Attempt to create parent directory and retry once
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(str(path), content)
+                return str(path)
+            except Exception as write_error:
+                raise StorageError(
+                    message=f"Failed to write summary to {path}",
+                    details={"path": str(path)},
+                ) from write_error
+
     # Determine file format for saved file: prefer markdown when saving by default
     save_format = output_format if output_format != "rich" else prefs.default_summary_format
+
+    # Build the formatted content once
+    content = _format_summary_content(document, result, save_format)
 
     # If user provided an explicit output path, keep behavior (bypass organized storage)
     if output_path:
         save_path = Path(output_path)
         # ensure parent exists
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        if save_path.exists():
-            console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {save_path}")
-        content = _format_summary_content(document, result, save_format)
-        save_path.write_text(content, encoding="utf-8")
-        return str(save_path)
+        return _write_summary_atomic(save_path, content)
 
     # Otherwise use organized storage (respect preferences)
     storage = prefs.to_organized_storage()
     target = storage.get_organized_path(document.path, save_format)
     storage.ensure_directory_exists()
 
-    if target.exists():
-        console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {target}")
-
-    content = _format_summary_content(document, result, save_format)
-    # Write atomically when possible
-    try:
-        atomic_write_text(str(target), content)
-    except FileNotFoundError:
-        # Directory may have been removed between ensure and write; recreate once.
-        storage.ensure_directory_exists()
-        atomic_write_text(str(target), content)
-    except Exception:
-        # Fallback best-effort write; re-raise if this fails as well.
-        try:
-            target.write_text(content, encoding="utf-8")
-        except Exception as write_error:
-            raise StorageError(message=f"Failed to write summary to {target}", details={"path": str(target)}) from write_error
-
-    # Optionally return metadata (currently returning path for CLI display)
-    # We return the path; avoid assigning unused metadata to satisfy linters.
-
-    return str(target)
-
-
-    return str(target)
+    return _write_summary_atomic(target, content)
 
 
 def _determine_output_path(
