@@ -383,9 +383,25 @@ def _save_summary(
                 atomic_write_text(str(path), content)
                 return str(path)
             except Exception as write_error:
+                # Attempt to include available disk space info if possible
+                available = None
+                try:
+                    import shutil as _sh
+
+                    stat = _sh.disk_usage(str(path.parent))
+                    available = stat.free
+                except Exception:
+                    available = None
+
+                details = {"path": str(path)}
+                if available is not None:
+                    details["available_bytes"] = available
+                details["suggested_action"] = (
+                    "Check write permissions and available disk space; you can also pass --output to save to a custom location."
+                )
                 raise StorageError(
                     message=f"Failed to write summary to {path}",
-                    details={"path": str(path)},
+                    details=details,
                 ) from write_error
 
     # Determine file format for saved file: prefer markdown when saving by default

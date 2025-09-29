@@ -58,7 +58,8 @@ def test_get_organized_path_basic(tmp_path):
     doc = "documents/examples/cover_letter.md"
     p = storage.get_organized_path(doc)
     assert p.name.endswith("_summary.md")
-    assert "hlpr" in str(p)
+    # default organized base was changed to 'summaries/documents'
+    assert "summaries" in str(p)
 
 
 def test_generate_filename_blocks_traversal(tmp_path):
