@@ -24,4 +24,6 @@ def test_cli_min_free_mb_blocks_save(tmp_path, monkeypatch):
 
     # Typer maps StorageError to exit code 7
     assert result.exit_code == 7
-    assert "Storage error" in result.output or "Insufficient disk space" in result.output
+    assert (
+        "Storage error" in result.output or "Insufficient disk space" in result.output
+    )

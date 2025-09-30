@@ -55,9 +55,7 @@ class DocumentSummaryResponse(BaseModel):
     format: str = Field(..., description="Response format")
     storage_info: dict | None = Field(
         None,
-        description=(
-            "Optional storage metadata when saved to disk"
-        ),
+        description=("Optional storage metadata when saved to disk"),
     )
 
 
@@ -456,6 +454,7 @@ async def summarize_document(  # noqa: C901 - endpoint orchestrates multiple val
                 "Received document upload",
                 extra=build_safe_extra(log_ctx, **file_extra),
             )
+
             # Read optional save flags from query params
             def _parse_bool(value: str | None) -> bool:
                 if value is None:

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid4
-import os
 
 from hlpr.config.storage import (
     DEFAULT_MIN_FREE_BYTES,
@@ -31,6 +31,14 @@ class OrganizedStorage:
     min_free_bytes: int | None = DEFAULT_MIN_FREE_BYTES
 
     def get_organized_base(self) -> Path:
+        # By default we place summaries under a top-level `hlpr/` folder to
+        # match CLI expectations (e.g., <cwd>/hlpr/summaries/documents). When
+        # a caller provides a custom `summaries_folder` value (explicitly),
+        # preserve that exact path relative to the configured base so tests
+        # which pass a custom folder (e.g., tmpdir/protected_base) behave as
+        # expected.
+        if self.summaries_folder == "summaries/documents":
+            return self.base_directory.joinpath("hlpr", self.summaries_folder)
         return self.base_directory.joinpath(self.summaries_folder)
 
     def _sanitized_stem(self, document_path: str) -> str:
@@ -83,12 +91,12 @@ class OrganizedStorage:
                     message="Permission denied: storage directory is not writable",
                     details={"path": str(base)},
                 )
-        except OSError:
+        except OSError as e:
             # If os.access fails for some reason, raise a generic storage error
             raise StorageError(
                 message="Failed to validate storage directory permissions",
                 details={"path": str(base)},
-            )
+            ) from e
 
         # Disk space check: honor min_free_bytes if set
         if self.min_free_bytes is not None:

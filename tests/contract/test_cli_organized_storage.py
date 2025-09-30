@@ -17,7 +17,9 @@ def test_cli_creates_organized_storage(tmp_path, monkeypatch):
     # Assert: command succeeded and organized folder exists with expected file
     assert res.exit_code == 0, res.output
     summaries_dir = cwd / "hlpr" / "summaries" / "documents"
-    assert summaries_dir.exists(), "Organized summaries directory should exist after CLI save"
+    assert summaries_dir.exists(), (
+        "Organized summaries directory should exist after CLI save"
+    )
     # Check for the generated summary file
     expected = summaries_dir / "test_document_summary.md"
     assert expected.exists(), f"Expected summary file at {expected}"

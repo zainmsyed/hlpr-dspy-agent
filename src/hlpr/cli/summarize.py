@@ -3,7 +3,9 @@
 import contextlib
 import json
 import logging
+import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -192,7 +194,7 @@ def summarize_document(
             extra=build_safe_extra(log_ctx, **complete_extra),
         )
 
-        # Save to file if requested
+        # Save to file if requested or offer interactive save when running in TTY
         if save:
             try:
                 # Build preferences with optional override from CLI
@@ -200,8 +202,23 @@ def summarize_document(
                 if min_free_mb is not None:
                     prefs.min_free_bytes = int(min_free_mb) * 1024 * 1024
 
-                output_path = _save_summary(document, result, output_format, output, prefs)
+                output_path = _save_summary(
+                    document, result, output_format, output, prefs
+                )
                 console.print(f"\n[green]Summary saved to:[/green] {output_path}")
+            except StorageError as se:
+                console.print(f"[red]Storage error:[/red] {se}")
+                raise typer.Exit(7) from se
+        else:
+            # Offer interactive save flow (privacy-first). This will only save
+            # when running in TTY or when HLPR_AUTO_SAVE is set.
+            try:
+                prefs = OutputPreferences()
+                saved = _interactive_save_flow(
+                    document, result, output_format, output, prefs
+                )
+                if saved:
+                    console.print(f"\n[green]Summary saved to:[/green] {saved}")
             except StorageError as se:
                 console.print(f"[red]Storage error:[/red] {se}")
                 raise typer.Exit(7) from se
@@ -373,7 +390,9 @@ def _save_summary(
         """
         try:
             if path.exists():
-                console.print(f"[yellow]Warning:[/yellow] Overwriting existing file: {path}")
+                console.print(
+                    f"[yellow]Warning:[/yellow] Overwriting existing file: {path}"
+                )
             atomic_write_text(str(path), content)
             return str(path)
         except Exception:
@@ -405,7 +424,9 @@ def _save_summary(
                 ) from write_error
 
     # Determine file format for saved file: prefer markdown when saving by default
-    save_format = output_format if output_format != "rich" else prefs.default_summary_format
+    save_format = (
+        output_format if output_format != "rich" else prefs.default_summary_format
+    )
 
     # Build the formatted content once
     content = _format_summary_content(document, result, save_format)
@@ -422,7 +443,89 @@ def _save_summary(
     target = storage.get_organized_path(document.path, save_format)
     storage.ensure_directory_exists()
 
+    # Apply timestamp collision handling like interactive save flow
+    target = _unique_path_with_timestamp(target)
+
     return _write_summary_atomic(target, content)
+
+
+def _interactive_save_flow(
+    document: Document,
+    result: Any,
+    output_format: str,
+    output: str | None,
+    prefs: OutputPreferences | None = None,
+) -> str | None:
+    """Interactive save flow using Rich prompts.
+
+    Returns the saved path as string when a file was written, or None when
+    no save was performed.
+    """
+    from rich.prompt import Confirm, Prompt
+
+    prefs = prefs or OutputPreferences()
+
+    is_tty = sys.stdin.isatty()
+    auto_save_env = os.environ.get("HLPR_AUTO_SAVE", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    # Non-interactive privacy-first: do not save unless explicitly opted-in
+    if not is_tty and not auto_save_env and not output:
+        return None
+
+    # If user provided --output or --save flag was used, respect direct save
+    if output:
+        # Use existing save path logic
+        try:
+                prefs = prefs or OutputPreferences()
+                return _save_summary(document, result, output_format, output, prefs)
+        except StorageError:
+            raise
+
+    # If non-interactive but HLPR_AUTO_SAVE=true, proceed with defaults
+    if not is_tty and auto_save_env:
+        chosen_format = (
+            output_format if output_format != "rich" else prefs.default_summary_format
+        )
+        # compute organized storage path
+        storage = prefs.to_organized_storage()
+        target = storage.get_organized_path(document.path, chosen_format)
+        target = _unique_path_with_timestamp(target)
+        content = _format_summary_content(document, result, chosen_format)
+        _ = atomic_write_text(str(target), content)
+        return str(target)
+
+    # Interactive TTY path: prompt user
+    try:
+        confirm = Confirm.ask("Save summary to file?", default=True)
+        if not confirm:
+            return None
+
+        fmt = Prompt.ask(
+            "Format",
+            choices=["md", "txt", "json"],
+            default=prefs.default_summary_format,
+        )
+
+        # Default output location = organized storage
+        storage = prefs.to_organized_storage()
+        default_path = storage.get_organized_path(document.path, fmt)
+        out_path_text = Prompt.ask("Output path", default=str(default_path))
+        out_path = Path(out_path_text)
+        # Avoid collisions by appending timestamp when necessary
+        out_path = _unique_path_with_timestamp(out_path)
+
+        content = _format_summary_content(document, result, fmt)
+        atomic_write_text(str(out_path), content)
+        return str(out_path)
+    except StorageError:
+        raise
+    except Exception as e:
+        # Map and surface as StorageError for caller to present friendly message
+        raise StorageError(message=str(e), details={"stage": "interactive_save"}) from e
 
 
 def _determine_output_path(
@@ -441,6 +544,22 @@ def _determine_output_path(
     if output_format == "md":
         return Path(f"{doc_name}_summary.md")
     return Path(f"{doc_name}_summary.txt")
+
+
+def _unique_path_with_timestamp(path: Path) -> Path:
+    """If `path` exists, return a new Path with a timestamp suffix
+
+    Example: summary.md -> summary_20250929T153045.md
+    The timestamp format is YYYYMMDDTHHMMSS.
+    """
+    if not path.exists():
+        return path
+
+    stem = path.stem
+    suffix = path.suffix or ""
+    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    new_name = f"{stem}_{ts}{suffix}"
+    return path.with_name(new_name)
 
 
 def _format_summary_content(document: Document, result: Any, output_format: str) -> str:
@@ -723,6 +842,40 @@ def summarize_meeting(
             out_path.write_text(json.dumps(out_data, indent=2), encoding="utf-8")
             console.print(f"[green]Summary saved to:[/green] {out_path}")
             return
+
+        # If user didn't pass --save, offer interactive save flow (privacy-first)
+        if not save:
+            try:
+                prefs = OutputPreferences()
+                # Avoid strict file validation when the meeting summary is
+                # produced from in-memory text (e.g., empty or generated
+                # overview). The interactive save flow only needs a small
+                # document-like object with `path` for naming and the
+                # resulting summary text. We construct a lightweight stub
+                # to avoid Document.from_file raising on empty files.
+                doc_stub = type(
+                    "_DocStub",
+                    (),
+                    {
+                        "path": str(Path(file_path).absolute()),
+                        "format": type("F", (), {"value": "txt"}),
+                        "size_bytes": Path(file_path).stat().st_size if Path(file_path).exists() else 0,
+                    },
+                )()
+
+                saved = _interactive_save_flow(
+                    doc_stub,
+                    type("_R", (), {"summary": overview}),
+                    output_format,
+                    output,
+                    prefs,
+                )
+                if saved:
+                    console.print(f"\n[green]Summary saved to:[/green] {saved}")
+                    return
+            except StorageError as se:
+                console.print(f"[red]Storage error:[/red] {se}")
+                raise typer.Exit(7) from se
 
         # Otherwise display to console
         _display_meeting_summary(

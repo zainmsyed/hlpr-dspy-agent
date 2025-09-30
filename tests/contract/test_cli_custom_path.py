@@ -10,8 +10,8 @@ def test_cli_respects_custom_output_path(tmp_path, monkeypatch):
     runner = CliRunner()
     from hlpr.cli.main import app as main_app
 
-    res = runner.invoke(main_app, ["summarize", "document", str(doc), "--save", "--output", str(custom)])
+    res = runner.invoke(
+        main_app, ["summarize", "document", str(doc), "--save", "--output", str(custom)]
+    )
     assert res.exit_code == 0, res.output
     assert custom.exists(), "Custom output file should be created when using --output"
-
-

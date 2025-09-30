@@ -1,12 +1,12 @@
-import os
-import stat
 import shutil
+import stat
 from pathlib import Path
 
 import pytest
 
-from hlpr.io.organized_storage import OrganizedStorage
+from hlpr.config.storage import MAX_FILENAME_STEM_LENGTH, SAFE_FILENAME_PATTERN
 from hlpr.exceptions import StorageError
+from hlpr.io.organized_storage import OrganizedStorage
 
 
 def test_ensure_directory_creates_base(tmp_path):
@@ -25,7 +25,9 @@ def test_permission_error_raises(tmp_path):
     # Remove write permissions for owner
     protected.chmod(stat.S_IREAD)
 
-    storage = OrganizedStorage(base_directory=protected.parent, summaries_folder=str(protected.name))
+    storage = OrganizedStorage(
+        base_directory=protected.parent, summaries_folder=str(protected.name)
+    )
 
     try:
         with pytest.raises(StorageError):
@@ -38,19 +40,10 @@ def test_permission_error_raises(tmp_path):
 def test_min_free_bytes_check(tmp_path, monkeypatch):
     storage = OrganizedStorage(base_directory=tmp_path)
     # Force an extremely large min_free_bytes to trigger insufficient space
-    storage.min_free_bytes = 10 ** 18
+    storage.min_free_bytes = 10**18
 
     with pytest.raises(StorageError):
         storage.ensure_directory_exists()
-import re
-import shutil
-from pathlib import Path
-
-import pytest
-
-from hlpr.config.storage import MAX_FILENAME_STEM_LENGTH, SAFE_FILENAME_PATTERN
-from hlpr.exceptions import StorageError
-from hlpr.io.organized_storage import OrganizedStorage
 
 
 def test_get_organized_path_basic(tmp_path):
@@ -88,6 +81,8 @@ def test_generate_filename_sanitizes_invalid_chars(tmp_path):
 
     fname = storage.generate_filename(name, "txt")
     stem = fname.rsplit(".", 1)[0].removesuffix("_summary")
+
+    import re
 
     forbidden = re.compile(SAFE_FILENAME_PATTERN)
     assert forbidden.search(stem) is None

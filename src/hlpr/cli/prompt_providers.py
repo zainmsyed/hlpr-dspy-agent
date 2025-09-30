@@ -114,7 +114,9 @@ class InteractivePromptProvider:
             typer.echo(f"Invalid format: {msg}")
             self._help.show_format_help()
         # fallback after attempts exhausted
-        typer.echo(f"Max attempts exceeded, using default format: {default} (when saving defaults to md)")
+        typer.echo(
+            f"Max attempts exceeded, using default format: {default} (when saving defaults to md)"
+        )
         return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:

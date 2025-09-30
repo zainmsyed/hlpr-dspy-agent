@@ -10,4 +10,3 @@ def test_output_preferences_default_min_free_bytes():
 def test_output_preferences_override_min_free_bytes():
     prefs = OutputPreferences(min_free_bytes=1234)
     assert prefs.min_free_bytes == 1234
-

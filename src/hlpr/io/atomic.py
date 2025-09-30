@@ -5,9 +5,9 @@ from __future__ import annotations
 import contextlib
 import os
 import tempfile
-from pathlib import Path
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
+from pathlib import Path
 
 
 def atomic_write_text(path: str | Path, text: str, encoding: str = "utf-8") -> None:
@@ -28,42 +28,36 @@ def atomic_write_text(path: str | Path, text: str, encoding: str = "utf-8") -> N
     @contextmanager
     def _file_lock(target: Path) -> Iterator[None]:
         lock_path = target.parent / ("." + target.name + ".lock")
+        # Open the lock file (create if missing). If it fails, fall back to
+        # no-op locking.
         try:
-            # Open the lock file (create if missing)
-            fd = open(lock_path, "a+")
+            with open(lock_path, "a+") as fd:
+                # Attempt to acquire an exclusive fcntl lock on POSIX systems.
+                # If fcntl isn't available or locking fails, suppress the
+                # error and continue with best-effort semantics.
+                with contextlib.suppress(Exception):
+                    import fcntl  # type: ignore
+
+                    fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
+
+                try:
+                    yield
+                finally:
+                    # Attempt to release lock; ignore failures as this is
+                    # best-effort cleanup.
+                    with contextlib.suppress(Exception):
+                        import fcntl  # type: ignore
+
+                        fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
         except OSError:
             # Can't open lock file; no-op locking
             yield
             return
 
-        try:
-            try:
-                import fcntl  # type: ignore
-
-                fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
-            except Exception:
-                # If fcntl isn't available or locking fails, continue
-                pass
-            yield
-        finally:
-            try:
-                import fcntl  # type: ignore
-
-                try:
-                    fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
-                except Exception:
-                    pass
-            except Exception:
-                pass
-            try:
-                fd.close()
-            except Exception:
-                pass
-            # Best-effort: remove the lock file if it's empty
-            with contextlib.suppress(OSError):
-                # Only remove if empty to avoid deleting a lock used by others
-                if lock_path.exists() and lock_path.stat().st_size == 0:
-                    lock_path.unlink()
+        # Best-effort: remove the lock file if it's empty
+        with contextlib.suppress(OSError):
+            if lock_path.exists() and lock_path.stat().st_size == 0:
+                lock_path.unlink()
 
     # Create a temp file in the same directory to ensure os.replace is atomic
     fd, tmp_path = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
