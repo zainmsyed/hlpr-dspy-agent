@@ -68,7 +68,7 @@ def summarize_document(
     provider: str = typer.Option(
         "local",
         "--provider",
-        help=("AI provider to use [local|openai|anthropic|groq|together]"),
+        help=("AI provider to use [local|openai|google|anthropic|openrouter|groq|deepseek|glm|cohere|mistral]"),
     ),
     save: bool = typer.Option(
         default=False,

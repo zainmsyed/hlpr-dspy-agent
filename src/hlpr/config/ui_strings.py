@@ -60,10 +60,15 @@ TEMPERATURE_RANGE_MSG = "Temperature must be between 0.0 and 1.0"
 # Quick help text used by HelpDisplay
 PROVIDER_HELP: Mapping[str, str] = {
     "local": "Fast offline processing. Good for small docs and privacy-sensitive data.",
-    "openai": "Cloud-based, high-quality models (requires API credentials).",
-    "anthropic": "Alternative cloud provider. Check rate limits and pricing.",
-    "groq": "Low-latency cloud provider suitable for fast responses.",
-    "together": "Shared-provider option; behavior depends on your configuration.",
+    "openai": "OpenAI GPT models - high quality, requires API key and credits.",
+    "google": "Google Gemini models - competitive quality, requires API key.",
+    "anthropic": "Anthropic Claude models - excellent for analysis, requires API key.",
+    "openrouter": "Access multiple models through OpenRouter, requires API key.",
+    "groq": "Fast inference with Groq hardware acceleration, requires API key.",
+    "deepseek": "DeepSeek models - good for coding tasks, requires API key.",
+    "glm": "ChatGLM models - multilingual support, requires API key.",
+    "cohere": "Cohere models - good for embeddings and text tasks, requires API key.",
+    "mistral": "Mistral models - European AI provider, requires API key.",
 }
 
 FORMAT_HELP: Mapping[str, str] = {
