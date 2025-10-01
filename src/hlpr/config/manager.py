@@ -88,9 +88,8 @@ class ConfigurationManager:
                     key = key.strip().upper()
                     # Remove surrounding quotes if present and strip spaces
                     val = value.strip()
-                    if (
-                        (val.startswith('"') and val.endswith('"'))
-                        or (val.startswith("'") and val.endswith("'"))
+                    if (val.startswith('"') and val.endswith('"')) or (
+                        val.startswith("'") and val.endswith("'")
                     ):
                         val = val[1:-1]
                     val = val.strip()
@@ -190,9 +189,7 @@ class ConfigurationManager:
                 # Build a minimal defaults mapping for the template
                 dp = safe_obj.get("default_provider", _defaults.DEFAULT_PROVIDER)
                 df = safe_obj.get("default_format", _defaults.DEFAULT_FORMAT)
-                dt = safe_obj.get(
-                    "default_temperature", _defaults.DEFAULT_TEMPERATURE
-                )
+                dt = safe_obj.get("default_temperature", _defaults.DEFAULT_TEMPERATURE)
                 dm = safe_obj.get("default_max_tokens", _defaults.DEFAULT_MAX_TOKENS)
                 defaults_map = {
                     "default_provider": dp,
@@ -210,14 +207,13 @@ class ConfigurationManager:
 
         If no credentials present and file missing, prefer the default template.
         """
+
         def _build_env_content(credentials: APICredentials) -> str:
             lines: list[str] = []
             lines.append(f"OPENAI_API_KEY={credentials.openai_api_key or ''}\n")
             lines.append(f"GOOGLE_API_KEY={credentials.google_api_key or ''}\n")
             lines.append(f"ANTHROPIC_API_KEY={credentials.anthropic_api_key or ''}\n")
-            lines.append(
-                f"OPENROUTER_API_KEY={credentials.openrouter_api_key or ''}\n"
-            )
+            lines.append(f"OPENROUTER_API_KEY={credentials.openrouter_api_key or ''}\n")
             lines.append(f"GROQ_API_KEY={credentials.groq_api_key or ''}\n")
             lines.append(f"DEEPSEEK_API_KEY={credentials.deepseek_api_key or ''}\n")
             lines.append(f"GLM_API_KEY={credentials.glm_api_key or ''}\n")
@@ -228,17 +224,14 @@ class ConfigurationManager:
         try:
             from hlpr.config import templates
 
-            if (
-                not self.paths.env_file.exists()
-                and all(
-                    getattr(creds, k) in (None, "")
-                    for k in (
-                        "openai_api_key",
-                        "google_api_key",
-                        "anthropic_api_key",
-                        "openrouter_api_key",
-                        "groq_api_key",
-                    )
+            if not self.paths.env_file.exists() and all(
+                getattr(creds, k) in (None, "")
+                for k in (
+                    "openai_api_key",
+                    "google_api_key",
+                    "anthropic_api_key",
+                    "openrouter_api_key",
+                    "groq_api_key",
                 )
             ):
                 return templates.default_env_template()
@@ -250,9 +243,9 @@ class ConfigurationManager:
         # Ensure directory
         self.paths.config_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save YAML config.
-    # Convert Pydantic model to primitives. Use model_dump() for v2,
-    # fall back to dict().
+        # Save YAML config.
+        # Convert Pydantic model to primitives. Use model_dump() for v2,
+        # fall back to dict().
         if hasattr(state.config, "model_dump"):
             data_obj = state.config.model_dump()
         else:
@@ -261,6 +254,7 @@ class ConfigurationManager:
         # Recursive convert enums, Paths, and other non-primitive types to primitives
         def _to_primitives(o):
             from enum import Enum
+
             if isinstance(o, Enum):
                 return o.value
             if isinstance(o, Path):

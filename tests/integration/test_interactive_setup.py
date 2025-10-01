@@ -1,4 +1,3 @@
-
 from hlpr.cli.config import setup_config
 from hlpr.config.models import ConfigurationPaths
 

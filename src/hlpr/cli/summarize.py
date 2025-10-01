@@ -68,7 +68,9 @@ def summarize_document(
     provider: str = typer.Option(
         "local",
         "--provider",
-        help=("AI provider to use [local|openai|google|anthropic|openrouter|groq|deepseek|glm|cohere|mistral]"),
+        help=(
+            "AI provider to use [local|openai|google|anthropic|openrouter|groq|deepseek|glm|cohere|mistral]"
+        ),
     ),
     save: bool = typer.Option(
         default=False,
@@ -154,10 +156,39 @@ def summarize_document(
         )
         document, extracted_text = _parse_with_progress(file_path)
 
-        # Initialize summarizer (use CONFIG.default_timeout when not provided)
-        timeout_val = (
-            dspy_timeout if dspy_timeout is not None else CONFIG.default_timeout
-        )
+        # Determine timeout: CLI flag > persisted config > module CONFIG
+        timeout_val = dspy_timeout
+        if timeout_val is None:
+            # Try persisted configuration state attached to Typer app if present
+            try:
+                import typer as _typer
+
+                # Access Typer internals for side-effect only; do not store
+                # the result in a variable since it is unused.
+                _typer.main.get_command()
+            except Exception:
+                pass
+
+            # Prefer CONFIG from module-level, but fall back to persistent state
+            if timeout_val is None:
+                try:
+                    timeout_val = CONFIG.default_timeout if CONFIG else None
+                except Exception:
+                    timeout_val = None
+            # If the app attached a configuration_state, prefer that value
+            try:
+                if hasattr(app, "app") and hasattr(app.app, "configuration_state"):
+                    st = app.app.configuration_state
+                    if st and getattr(st, "config", None):
+                        timeout_val = st.config.timeout_seconds or timeout_val
+            except Exception:
+                # ignore lookup errors
+                pass
+            if timeout_val is None:
+                timeout_val = 30
+        # Validate API key presence for cloud providers
+        _ensure_api_key_for_provider(provider)
+
         summarizer = DocumentSummarizer(
             provider=provider,
             model=model,
@@ -480,8 +511,8 @@ def _interactive_save_flow(
     if output:
         # Use existing save path logic
         try:
-                prefs = prefs or OutputPreferences()
-                return _save_summary(document, result, output_format, output, prefs)
+            prefs = prefs or OutputPreferences()
+            return _save_summary(document, result, output_format, output, prefs)
         except StorageError:
             raise
 
@@ -711,6 +742,58 @@ def _summarize_with_progress(
             return result
 
 
+def _ensure_api_key_for_provider(provider_name: str) -> None:
+    """Ensure an API key exists for the chosen provider when required.
+
+    Checks (in order): environment variables (OPENAI_API_KEY, etc.), persisted
+    configuration state (.env) via app.config_manager, otherwise raises
+    ConfigurationError.
+    """
+    from hlpr.config.models import ProviderType
+
+    try:
+        provider = ProviderType(provider_name)
+    except Exception:
+        # Unknown provider - let downstream code handle validation
+        return
+
+    if provider == ProviderType.LOCAL:
+        return
+
+    # Map provider enum to environment variable name
+    env_map = {
+        ProviderType.OPENAI: "OPENAI_API_KEY",
+        ProviderType.GOOGLE: "GOOGLE_API_KEY",
+        ProviderType.ANTHROPIC: "ANTHROPIC_API_KEY",
+        ProviderType.OPENROUTER: "OPENROUTER_API_KEY",
+        ProviderType.GROQ: "GROQ_API_KEY",
+        ProviderType.DEEPSEEK: "DEEPSEEK_API_KEY",
+        ProviderType.GLM: "GLM_API_KEY",
+        ProviderType.COHERE: "COHERE_API_KEY",
+        ProviderType.MISTRAL: "MISTRAL_API_KEY",
+    }
+
+    env_name = env_map.get(provider)
+    if env_name and os.environ.get(env_name):
+        return
+
+    # Check persisted .env via app config manager if available
+    try:
+        if hasattr(app, "app") and hasattr(app.app, "configuration_state"):
+            st = app.app.configuration_state
+            if st and getattr(st, "credentials", None):
+                creds = st.credentials
+                key = creds.get_key_for_provider(provider)
+                if key:
+                    return
+    except Exception:
+        pass
+
+    raise ConfigurationError(
+        f"Missing API key for provider '{provider.value}'. Set {env_name} or run 'hlpr config setup' to provide credentials."
+    )
+
+
 def _parse_meeting_file(file_path: str) -> tuple[str, list[str], list[str]]:
     """Parse meeting file and extract overview, key points, and action items."""
     path = Path(file_path)
@@ -859,7 +942,9 @@ def summarize_meeting(
                     {
                         "path": str(Path(file_path).absolute()),
                         "format": type("F", (), {"value": "txt"}),
-                        "size_bytes": Path(file_path).stat().st_size if Path(file_path).exists() else 0,
+                        "size_bytes": Path(file_path).stat().st_size
+                        if Path(file_path).exists()
+                        else 0,
                     },
                 )()
 
@@ -931,9 +1016,24 @@ def summarize_guided(
             # the real parse + summarization path. We avoid relying on the
             # simulation-only run_with_phases here so guided mode actually
             # performs processing when the user requests execution.
-            base_opts = session.collect_basic_options(
-                {"provider": provider, "format": output_format}
-            )
+            # If a persisted configuration exists, seed guided prompts with
+            # user preferences to make the guided flow remember choices.
+            seed = {"provider": provider, "format": output_format}
+            try:
+                if hasattr(app, "app") and hasattr(app.app, "configuration_state"):
+                    st = app.app.configuration_state
+                    if st and getattr(st, "config", None):
+                        cfg = st.config
+                        seed["provider"] = getattr(
+                            cfg.default_provider, "value", cfg.default_provider
+                        )
+                        seed["format"] = getattr(
+                            cfg.default_format, "value", cfg.default_format
+                        )
+            except Exception:
+                pass
+
+            base_opts = session.collect_basic_options(seed)
             opts = session.collect_advanced_options(base_opts, {})
 
             # Convert ProcessingOptions to plain dict for compatibility
@@ -977,6 +1077,9 @@ def summarize_guided(
 
             # Build summarizer using options collected
             timeout_val = CONFIG.default_timeout
+            # Validate API key for provider selected in guided options
+            _ensure_api_key_for_provider(opts_dict.get("provider", "local"))
+
             summarizer = DocumentSummarizer(
                 provider=opts_dict.get("provider", "local"),
                 model=opts_dict.get("model", "gemma3:latest"),
@@ -1011,6 +1114,34 @@ def summarize_guided(
                     logger.warning("Failed to display command template")
             except Exception:
                 logger.warning("Command template generation failed")
+
+            # Offer to save preference choices to user configuration if available
+            try:
+                if hasattr(app, "app") and hasattr(app.app, "config_manager"):
+                    mgr = app.app.config_manager
+                    st = app.app.configuration_state
+                    if mgr and st:
+                        # Update state with chosen preferences (non-destructive)
+                        cfg = st.config
+                        cfg.default_provider = opts_dict.get(
+                            "provider", cfg.default_provider
+                        )
+                        cfg.default_format = opts_dict.get("format", cfg.default_format)
+                        # Only save when running in a TTY (avoid overwriting in CI)
+                        import sys as _sys
+
+                        if _sys.stdin.isatty() and typer.confirm(
+                            "Save these preferences for future runs?", default=True
+                        ):
+                            try:
+                                mgr.save_configuration(st)
+                            except Exception:
+                                logger.warning(
+                                    "Failed to persist configuration preferences"
+                                )
+            except Exception:
+                # non-fatal
+                pass
 
             # We've completed the execute path; return to avoid running
             # the legacy non-execute simulation path below. When this

@@ -35,7 +35,18 @@ def add_provider(
 ) -> None:
     """Add a provider."""
     # Validate provider type
-    valid_types = {"openai", "google", "anthropic", "openrouter", "groq", "deepseek", "glm", "cohere", "mistral", "local"}
+    valid_types = {
+        "openai",
+        "google",
+        "anthropic",
+        "openrouter",
+        "groq",
+        "deepseek",
+        "glm",
+        "cohere",
+        "mistral",
+        "local",
+    }
     if provider_type not in valid_types:
         console.print("Invalid provider type")
         raise typer.Exit(1)

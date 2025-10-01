@@ -98,12 +98,12 @@ Single project structure - paths from repository root:
 - [x] T037 [P] Create configuration file templates with placeholder examples in `src/hlpr/config/templates.py`
 
 ## Phase 3.4: Integration
-- [ ] T038 Update main CLI entry point to load configuration at startup in `src/hlpr/cli/main.py`
-- [ ] T039 Integrate config defaults into existing summarize commands in `src/hlpr/cli/`
-- [ ] T040 Add configuration error handling to existing workflows
-- [ ] T041 Implement environment variable override support
-- [ ] T042 Update guided workflow to offer preference saving
-- [ ] T043 Add API key validation for cloud providers in existing commands
+ [x] T038 Update main CLI entry point to load configuration at startup in `src/hlpr/cli/main.py`
+ [x] T039 Integrate config defaults into existing summarize commands in `src/hlpr/cli/`
+ [x] T040 Add configuration error handling to existing workflows
+ [x] T041 Implement environment variable override support
+ [x] T042 Update guided workflow to offer preference saving
+ [x] T043 Add API key validation for cloud providers in existing commands
 
 ## Phase 3.5: Polish
 

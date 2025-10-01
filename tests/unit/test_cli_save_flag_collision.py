@@ -20,7 +20,9 @@ def test_cli_save_flag_collision_handling(tmp_path):
     doc_path.write_text("Test content")
 
     document = Document.from_file(str(doc_path))
-    result = SimpleNamespace(summary="Test summary", key_points=[], processing_time_ms=100)
+    result = SimpleNamespace(
+        summary="Test summary", key_points=[], processing_time_ms=100
+    )
 
     # Set up preferences to use tmp_path as base
     prefs = OutputPreferences()

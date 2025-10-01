@@ -17,7 +17,10 @@ def test_user_configuration_path_expansion(tmp_path):
     p = tmp_path / "out"
     cfg = UserConfiguration(default_output_directory=str(p))
     assert isinstance(cfg.default_output_directory, Path)
-    assert cfg.default_output_directory.exists() or not cfg.default_output_directory.exists()
+    assert (
+        cfg.default_output_directory.exists()
+        or not cfg.default_output_directory.exists()
+    )
 
 
 def test_invalid_temperature_raises():

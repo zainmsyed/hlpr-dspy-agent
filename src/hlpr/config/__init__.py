@@ -55,6 +55,7 @@ else:
 try:
     # Import the new models module lazily; tests and new code can import it.
     from . import models  # type: ignore
+
     __all__.append("models")
 except ImportError:
     # If import fails, keep package usable; tests will fail with clear ImportError

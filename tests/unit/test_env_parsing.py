@@ -22,7 +22,7 @@ def test_env_parsing_basic(tmp_path):
 def test_env_parsing_quoted_and_spaced(tmp_path):
     paths = _make_paths(tmp_path)
     paths.env_file.write_text(
-        'OPENAI_API_KEY = "sk-quoted"\nGOOGLE_API_KEY=  sk-spaces  \nANTHROPIC_API_KEY=\'sk-single\'\n'
+        "OPENAI_API_KEY = \"sk-quoted\"\nGOOGLE_API_KEY=  sk-spaces  \nANTHROPIC_API_KEY='sk-single'\n"
     )
     mgr = ConfigurationManager(paths=paths)
     creds = mgr._parse_env_file()
@@ -33,7 +33,9 @@ def test_env_parsing_quoted_and_spaced(tmp_path):
 
 def test_env_parsing_malformed_lines(tmp_path):
     paths = _make_paths(tmp_path)
-    paths.env_file.write_text("INVALID_LINE_NO_EQUALS\n=VALUE_NO_KEY\nOPENAI_API_KEY=ok\n")
+    paths.env_file.write_text(
+        "INVALID_LINE_NO_EQUALS\n=VALUE_NO_KEY\nOPENAI_API_KEY=ok\n"
+    )
     mgr = ConfigurationManager(paths=paths)
     creds = mgr._parse_env_file()
     assert creds.openai_api_key == "ok"

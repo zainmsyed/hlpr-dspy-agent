@@ -44,6 +44,7 @@ def _next_simulated_response() -> str | None:
         return None
     return _SIM_PROMPTS.pop(0)
 
+
 # Preferences sub-app
 preferences_app = typer.Typer(name="preferences", help="Manage user preferences")
 
@@ -110,7 +111,11 @@ def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
 
 
 @app.command("setup")
-def setup_config(non_interactive: bool = typer.Option(False, "--non-interactive", help="Run setup without interactive prompts")) -> None:
+def setup_config(
+    non_interactive: bool = typer.Option(
+        False, "--non-interactive", help="Run setup without interactive prompts"
+    ),
+) -> None:
     """Run guided setup for configuration.
 
     Interactive mode will prompt for provider, output format, temperature, max tokens and optional API key.
@@ -131,12 +136,16 @@ def setup_config(non_interactive: bool = typer.Option(False, "--non-interactive"
 
         # Provider
         default_provider = ProviderType.LOCAL.value
-        provider_choice = _prompt_choice("Choose default provider", [p.value for p in ProviderType], default_provider)
+        provider_choice = _prompt_choice(
+            "Choose default provider", [p.value for p in ProviderType], default_provider
+        )
         provider = ProviderType(provider_choice)
 
         # Output format
         default_format = OutputFormat.RICH.value
-        fmt_choice = _prompt_choice("Default output format", [f.value for f in OutputFormat], default_format)
+        fmt_choice = _prompt_choice(
+            "Default output format", [f.value for f in OutputFormat], default_format
+        )
         out_format = OutputFormat(fmt_choice)
 
         # Temperature
@@ -145,7 +154,9 @@ def setup_config(non_interactive: bool = typer.Option(False, "--non-interactive"
         if sim is not None:
             temp_raw = sim or str(temp_default)
         else:
-            temp_raw = typer.prompt(f"Default temperature [{temp_default}]") or str(temp_default)
+            temp_raw = typer.prompt(f"Default temperature [{temp_default}]") or str(
+                temp_default
+            )
         try:
             temperature = float(temp_raw)
         except Exception:
@@ -158,7 +169,9 @@ def setup_config(non_interactive: bool = typer.Option(False, "--non-interactive"
         if sim is not None:
             max_raw = sim or str(max_default)
         else:
-            max_raw = typer.prompt(f"Default max tokens [{max_default}]") or str(max_default)
+            max_raw = typer.prompt(f"Default max tokens [{max_default}]") or str(
+                max_default
+            )
         try:
             max_tokens = int(max_raw)
         except Exception:
@@ -210,7 +223,9 @@ def setup_config(non_interactive: bool = typer.Option(False, "--non-interactive"
         raise typer.Exit(0)
 
     # Not first run
-    console.print("Configuration already exists. Use 'hlpr config reset' to reset or 'hlpr config show' to view.")
+    console.print(
+        "Configuration already exists. Use 'hlpr config reset' to reset or 'hlpr config show' to view."
+    )
     raise typer.Exit(0)
 
 
@@ -249,7 +264,10 @@ def reset_config(backup: bool = typer.Option(True, "--backup/--no-backup")) -> N
 
 
 @app.command("show")
-def show_config(output_format: str = typer.Option("text", "--format"), hide_sensitive: bool = typer.Option(False)) -> None:
+def show_config(
+    output_format: str = typer.Option("text", "--format"),
+    hide_sensitive: bool = typer.Option(False),
+) -> None:
     """Show configuration."""
     paths = ConfigurationPaths.default()
     mgr = ConfigurationManager(paths=paths)
@@ -261,13 +279,19 @@ def show_config(output_format: str = typer.Option("text", "--format"), hide_sens
             "config": cfg.model_dump() if hasattr(cfg, "model_dump") else cfg.dict(),
             "credentials": {
                 k: ("***" if hide_sensitive and v else (v or ""))
-                for k, v in (creds.model_dump().items() if hasattr(creds, "model_dump") else creds.dict().items())
+                for k, v in (
+                    creds.model_dump().items()
+                    if hasattr(creds, "model_dump")
+                    else creds.dict().items()
+                )
             },
         }
         console.print_json(data=out)
         raise typer.Exit(0)
     # text format
-    for k, v in (cfg.model_dump().items() if hasattr(cfg, "model_dump") else cfg.dict().items()):
+    for k, v in (
+        cfg.model_dump().items() if hasattr(cfg, "model_dump") else cfg.dict().items()
+    ):
         console.print(f"{k}: {v}")
     if hide_sensitive:
         console.print("credentials: ****")
@@ -333,8 +357,8 @@ def get_config(key: str = typer.Argument(None)) -> NoReturn:
         console.print("Not found")
         raise typer.Exit(1)
 
-
     import json
+
     try:
         with open(kv_path, encoding="utf-8") as f:
             store = json.load(f) or {}
@@ -350,9 +374,12 @@ def get_config(key: str = typer.Argument(None)) -> NoReturn:
     raise typer.Exit(0)
 
 
-
 @app.command("edit")
-def edit_config(editor: str = typer.Option("", "--editor", help="Editor command to use (overrides $EDITOR)")) -> NoReturn:
+def edit_config(
+    editor: str = typer.Option(
+        "", "--editor", help="Editor command to use (overrides $EDITOR)"
+    ),
+) -> NoReturn:
     """Open the configuration file in the user's editor.
 
     If no editor is available, return exit code 2 to indicate no-op in tests.

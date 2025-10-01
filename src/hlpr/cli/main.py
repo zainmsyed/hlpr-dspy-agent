@@ -50,6 +50,29 @@ def main_callback(
     app.quiet = quiet
     app.config = config
 
+    # Load persisted user configuration early so subcommands can access it.
+    # We use a ConfigurationManager to load the YAML + .env state and attach
+    # it to the Typer app object for convenient access during command runtime.
+    try:
+        from hlpr.config.manager import ConfigurationManager
+        from hlpr.config.models import ConfigurationPaths
+
+        cfg_paths = ConfigurationPaths.default()
+        mgr = ConfigurationManager(paths=cfg_paths)
+        try:
+            state = mgr.load_configuration()
+        except Exception:
+            # If loading fails, surface a warning but keep running with defaults
+            state = None
+
+        # Attach to app for subcommands to read; avoid overwriting if already set
+        app.config_manager = mgr
+        app.configuration_state = state
+    except Exception:
+        # Best-effort: do not break CLI startup if config subsystem is missing
+        app.config_manager = None
+        app.configuration_state = None
+
 
 @app.command()
 def version() -> None:

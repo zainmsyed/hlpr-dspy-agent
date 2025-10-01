@@ -174,8 +174,8 @@ class DSPyDocumentSummarizer:
                 temperature=self.temperature,
             )
 
-    # Placeholder implementations for additional providers.
-    # These will need proper DSPy-specific integration per provider.
+        # Placeholder implementations for additional providers.
+        # These will need proper DSPy-specific integration per provider.
         if self.provider in [
             "google",
             "openrouter",

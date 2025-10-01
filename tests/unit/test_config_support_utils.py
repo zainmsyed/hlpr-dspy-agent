@@ -1,4 +1,3 @@
-
 from hlpr.config import defaults, migration, templates, validators
 
 
@@ -32,7 +31,10 @@ def test_migration_noop():
 
 
 def test_templates_generate():
-    d = {"provider": defaults.DEFAULT_PROVIDER, "temperature": defaults.DEFAULT_TEMPERATURE}
+    d = {
+        "provider": defaults.DEFAULT_PROVIDER,
+        "temperature": defaults.DEFAULT_TEMPERATURE,
+    }
     y = templates.default_config_yaml(d)
     assert "# hlpr configuration file" in y
     e = templates.default_env_template()
