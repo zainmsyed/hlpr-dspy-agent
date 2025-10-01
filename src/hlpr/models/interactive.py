@@ -10,9 +10,18 @@ from pydantic import BaseModel, Field, field_validator
 class ProcessingOptions(BaseModel):
     """Represents collected options for processing a document."""
 
-    provider: Literal["local", "openai", "google", "anthropic", "openrouter", "groq", "deepseek", "glm", "cohere", "mistral"] = Field(
-        "local", description="LLM provider"
-    )
+    provider: Literal[
+        "local",
+        "openai",
+        "google",
+        "anthropic",
+        "openrouter",
+        "groq",
+        "deepseek",
+        "glm",
+        "cohere",
+        "mistral",
+    ] = Field("local", description="LLM provider")
     format: Literal["rich", "txt", "md", "json"] = Field(
         "rich", description="Output format"
     )

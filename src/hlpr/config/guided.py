@@ -8,7 +8,18 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-ALLOWED_PROVIDERS: Sequence[str] = ("local", "openai", "google", "anthropic", "openrouter", "groq", "deepseek", "glm", "cohere", "mistral")
+ALLOWED_PROVIDERS: Sequence[str] = (
+    "local",
+    "openai",
+    "google",
+    "anthropic",
+    "openrouter",
+    "groq",
+    "deepseek",
+    "glm",
+    "cohere",
+    "mistral",
+)
 ALLOWED_FORMATS: Sequence[str] = ("rich", "txt", "md", "json")
 
 DEFAULT_PROVIDER = "local"

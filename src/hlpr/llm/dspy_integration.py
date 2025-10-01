@@ -57,7 +57,7 @@ class DSPyDocumentSummarizer:
     """DSPy-based document summarization service.
 
     Provides optimized summarization using DSPy with support for multiple
-    LLM providers including local, OpenAI, Google, Anthropic, OpenRouter, Groq, DeepSeek, GLM, Cohere, and Mistral.
+    LLM providers including local, OpenAI, and a set of cloud providers.
     """
 
     def __init__(
@@ -74,7 +74,17 @@ class DSPyDocumentSummarizer:
         """Initialize DSPy document summarizer.
 
         Args:
-            provider: LLM provider ('local', 'openai', 'google', 'anthropic', 'openrouter', 'groq', 'deepseek', 'glm', 'cohere', 'mistral')
+            provider: LLM provider. Supported values include:
+                - 'local'
+                - 'openai'
+                - 'google'
+                - 'anthropic'
+                - 'openrouter'
+                - 'groq'
+                - 'deepseek'
+                - 'glm'
+                - 'cohere'
+                - 'mistral'
             model: Model name to use
             api_base: Base URL for API (for local providers)
             api_key: API key for cloud providers
@@ -164,9 +174,16 @@ class DSPyDocumentSummarizer:
                 temperature=self.temperature,
             )
 
-        # Placeholder implementations for new providers
-        # These will need proper implementation based on each provider's DSPy integration
-        if self.provider in ["google", "openrouter", "deepseek", "glm", "cohere", "mistral"]:
+    # Placeholder implementations for additional providers.
+    # These will need proper DSPy-specific integration per provider.
+        if self.provider in [
+            "google",
+            "openrouter",
+            "deepseek",
+            "glm",
+            "cohere",
+            "mistral",
+        ]:
             if not self.api_key:
                 msg = f"API key required for {self.provider} provider"
                 raise ConfigurationError(msg)
@@ -634,7 +651,18 @@ class DSPyDocumentSummarizer:
         Returns:
             List of supported provider names
         """
-        return ["local", "openai", "google", "anthropic", "openrouter", "groq", "deepseek", "glm", "cohere", "mistral"]
+        return [
+            "local",
+            "openai",
+            "google",
+            "anthropic",
+            "openrouter",
+            "groq",
+            "deepseek",
+            "glm",
+            "cohere",
+            "mistral",
+        ]
 
     @classmethod
     def validate_provider_config(
@@ -661,7 +689,17 @@ class DSPyDocumentSummarizer:
             raise ConfigurationError(msg)
 
         # Cloud providers require API key
-        cloud_providers = ["openai", "google", "anthropic", "openrouter", "groq", "deepseek", "glm", "cohere", "mistral"]
+        cloud_providers = [
+            "openai",
+            "google",
+            "anthropic",
+            "openrouter",
+            "groq",
+            "deepseek",
+            "glm",
+            "cohere",
+            "mistral",
+        ]
         if provider in cloud_providers and not api_key:
             msg = f"API key required for {provider} provider"
             raise ConfigurationError(msg)

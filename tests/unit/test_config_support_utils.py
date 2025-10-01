@@ -1,6 +1,5 @@
-import os
 
-from hlpr.config import defaults, validators, migration, templates
+from hlpr.config import defaults, migration, templates, validators
 
 
 def test_defaults_values():

@@ -1,8 +1,8 @@
 """Config CLI - setup and management commands."""
 
+import os
 from typing import NoReturn
 
-import os
 import typer
 from rich.console import Console
 
@@ -245,7 +245,7 @@ def reset_config(backup: bool = typer.Option(True, "--backup/--no-backup")) -> N
         raise typer.Exit(0)
     except Exception as exc:
         console.print(f"Failed to reset configuration: {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
 
 @app.command("show")
@@ -315,7 +315,7 @@ def set_config(key: str, value: str) -> NoReturn:
         mgr._atomic_write(kv_path, text)
     except Exception as exc:
         console.print(f"Failed to set key: {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     console.print(f"Set {key}")
     raise typer.Exit(0)
@@ -338,9 +338,9 @@ def get_config(key: str = typer.Argument(None)) -> NoReturn:
     try:
         with open(kv_path, encoding="utf-8") as f:
             store = json.load(f) or {}
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
         console.print("Not found")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     if key not in store:
         console.print("Not found")
@@ -375,26 +375,12 @@ def edit_config(editor: str = typer.Option("", "--editor", help="Editor command 
         import shlex
         import subprocess
 
-        parts = shlex.split(cmd) + [str(cfg)]
+        parts = [*shlex.split(cmd), str(cfg)]
         subprocess.check_call(parts)
         raise typer.Exit(0)
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
         console.print("Editor returned non-zero exit")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     except Exception as exc:
         console.print(f"Failed to open editor: {exc}")
-        raise typer.Exit(1)
-    import json
-    try:
-        with open(kv_path, encoding="utf-8") as f:
-            store = json.load(f) or {}
-    except (OSError, json.JSONDecodeError):
-        console.print("Not found")
-        raise typer.Exit(1)
-
-    if key not in store:
-        console.print("Not found")
-        raise typer.Exit(1)
-
-    console.print(store[key])
-    raise typer.Exit(0)
+        raise typer.Exit(1) from exc

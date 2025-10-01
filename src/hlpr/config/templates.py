@@ -6,10 +6,8 @@ are used by the CLI to initialize configuration files and by unit tests.
 
 from __future__ import annotations
 
-from typing import Dict
 
-
-def default_config_yaml(defaults: Dict[str, object]) -> str:
+def default_config_yaml(defaults: dict[str, object]) -> str:
     """Return a YAML string for the default configuration.
 
     `defaults` should contain keys matching the UserConfiguration model.
@@ -18,10 +16,7 @@ def default_config_yaml(defaults: Dict[str, object]) -> str:
     lines: list[str] = []
     lines.append("# hlpr configuration file")
     for k, v in defaults.items():
-        if isinstance(v, bool):
-            val = "true" if v else "false"
-        else:
-            val = str(v)
+        val = ("true" if v else "false") if isinstance(v, bool) else str(v)
         lines.append(f"{k}: {val}")
     return "\n".join(lines) + "\n"
 

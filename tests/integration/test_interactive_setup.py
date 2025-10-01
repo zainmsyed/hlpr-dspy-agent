@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from hlpr.cli.config import setup_config
 from hlpr.config.models import ConfigurationPaths
@@ -19,11 +18,10 @@ def test_interactive_setup_creates_files(tmp_path, monkeypatch):
             if p.is_file():
                 p.unlink()
     # Call the setup function in non-interactive mode; it will raise click.Exit on success
-    try:
+    import contextlib
+
+    with contextlib.suppress(Exception):
         setup_config(non_interactive=True)
-    except Exception:
-        # typer raises click.exceptions.Exit; ignore for this test
-        pass
 
     config_dir = tmp_path / ".hlpr"
     assert config_dir.exists()
