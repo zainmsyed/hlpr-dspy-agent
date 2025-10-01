@@ -50,3 +50,12 @@ else:
     # configuration couldn't be loaded.
     CONFIG = None  # type: ignore[assignment]
     HlprConfig = None  # type: ignore[assignment]
+
+# Expose the new models submodule for imports like `from hlpr.config import models`
+try:
+    # Import the new models module lazily; tests and new code can import it.
+    from . import models  # type: ignore
+    __all__.append("models")
+except Exception:
+    # If import fails, keep package usable; tests will fail with clear ImportError
+    pass

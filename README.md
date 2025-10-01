@@ -105,6 +105,33 @@ specify `--format`.
 - For `provider=local`, the summarizer defaults to no timeout when not explicitly provided; pass `--dspy-timeout` if you want to enforce one. See `documents/local-dspy.md` for more details.
 - When piping to another process (e.g., `| jq ...`), prefer `--format json` to avoid ANSI sequences.
 
+## Testing interactive CLI
+
+Some CLI commands are interactive by default. For automated tests (CI) you can
+simulate prompt responses by setting the environment variable
+`HLPR_SIMULATED_PROMPTS` to a newline-separated list of responses. The CLI will
+consume these values in order and fall back to real interactive prompts when the
+variable is not set.
+
+Example (pytest / monkeypatch):
+
+```py
+def test_setup_non_interactive(monkeypatch, tmp_path):
+   monkeypatch.setenv("HOME", str(tmp_path))
+   # provider (enter), format (enter), temperature, max_tokens
+   monkeypatch.setenv("HLPR_SIMULATED_PROMPTS", "\n\n0.3\n8192")
+   # call the setup function directly or invoke the CLI
+   from hlpr.cli.config import setup_config
+   try:
+      setup_config(non_interactive=False)
+   except Exception:
+      # typer raises click.exceptions.Exit on success; ignore in tests
+      pass
+
+```
+
+This approach keeps interactive flows testable and avoids hanging CI runs.
+
 ## Troubleshooting
 
 - File not found: check the path or use an absolute path.

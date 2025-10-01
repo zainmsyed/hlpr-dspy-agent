@@ -163,7 +163,7 @@ class DSPyDocumentSummarizer:
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
             )
-        
+
         # Placeholder implementations for new providers
         # These will need proper implementation based on each provider's DSPy integration
         if self.provider in ["google", "openrouter", "deepseek", "glm", "cohere", "mistral"]:
@@ -178,7 +178,7 @@ class DSPyDocumentSummarizer:
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
             )
-            
+
         supported_providers = [
             "local",
             "openai",

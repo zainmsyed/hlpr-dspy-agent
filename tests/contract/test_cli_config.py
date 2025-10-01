@@ -16,7 +16,8 @@ class TestCliConfigContract:
 
         assert result.exit_code == 0
         # Should show configuration in yaml format by default
-        assert "default_llm" in result.output or "providers" in result.output
+        # CLI exposes `default_provider` in the configuration output
+        assert "default_provider" in result.output or "providers" in result.output
 
     def test_config_show_json_format(self):
         """Test showing configuration in JSON format"""
