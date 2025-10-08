@@ -5,7 +5,7 @@ from typing import NoReturn
 
 import typer
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Confirm, Prompt
 
 from hlpr.config.manager import ConfigurationManager
 from hlpr.config.models import (
@@ -252,11 +252,9 @@ def setup_config(
             key_prompt = f"Enter API key for {provider.value} (leave blank to skip)"
             # Check for simulated value first (tests)
             sim = _next_simulated_response()
-            if sim is not None:
-                api_key = sim
-            else:
-                # hide input when available
-                api_key = Prompt.ask(key_prompt, password=True)
+            api_key = sim if sim is not None else Prompt.ask(
+                key_prompt, password=True
+            )
             if api_key:
                 # Set the appropriate field on APICredentials
                 if provider == ProviderType.OPENAI:

@@ -23,7 +23,7 @@ from typing import Any, Protocol
 
 import typer
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Confirm, Prompt
 
 from hlpr.cli.help_display import HelpDisplay
 from hlpr.cli.prompts import OptionPrompts
