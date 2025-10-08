@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import shutil
 import tempfile
@@ -22,38 +23,140 @@ class ConfigurationManager:
         self.paths = paths or ConfigurationPaths.default()
         self.paths.config_dir.mkdir(parents=True, exist_ok=True)
         self.paths.backup_dir.mkdir(parents=True, exist_ok=True)
+        # Last backup metadata populated when load_configuration detects
+        # corruption or oversize and performs a backup. Callers (CLI) can
+        # inspect these fields immediately after load_configuration to
+        # surface user-facing warnings.
+        self.last_backup_path: Path | None = None
+        self.last_backup_reason: str | None = None
+
+        # Logger for structured messages
+        self.logger = logging.getLogger("hlpr.config.manager")
+
+        # Retention policy: keep last N backups (most recent kept)
+        self.BACKUP_RETENTION = 10
 
     def load_configuration(self) -> ConfigurationState:
         # If config yaml doesn't exist, return defaults
         if not self.paths.config_file.exists():
             return ConfigurationState()
 
+    # Guard: if file is huge (protect against accidental large configs),
+    # treat as corrupted.
+        try:
+            if self.paths.config_file.stat().st_size > 1 * 1024 * 1024:
+                return self._backup_and_return_defaults(suffix=".oversize")
+        except OSError:
+            # If stat fails, fall through to normal loading (best-effort)
+            pass
+
         # Load YAML (with graceful fallback on parse errors)
         try:
             with open(self.paths.config_file, encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+                data = yaml.safe_load(f)
+                # If the YAML doesn't produce a mapping, treat it as corrupted
+                if not isinstance(data, dict):
+                    return self._backup_and_return_defaults()
+                data = data or {}
+
+                # If the YAML contains unexpected top-level keys which do not map
+                # to the UserConfiguration model fields, treat as corrupted so we
+                # don't silently ignore malformed files.
+                try:
+                    expected = set(UserConfiguration.model_fields.keys())
+                except (AttributeError, TypeError):
+                    expected = set()
+                if expected and (set(data.keys()) - expected):
+                    return self._backup_and_return_defaults()
         except (OSError, yaml.YAMLError):
             # Move the corrupted file to backups with a timestamp and return
             # defaults if the YAML is unreadable.
-            try:
-                import time
-
-                ts = time.strftime("%Y%m%d-%H%M%S")
-                bak_name = f"config.yaml.corrupted.{ts}"
-                bak_path = self.paths.backup_dir / bak_name
-                self.paths.backup_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(self.paths.config_file, bak_path)
-            except OSError:
-                # Best-effort: ignore backup failures
-                pass
-            return ConfigurationState()
+            return self._backup_and_return_defaults()
 
         # Load env credentials using robust parser
         creds = self._parse_env_file()
 
-        # Build ConfigurationState
-        config = UserConfiguration(**data)
+        # Build ConfigurationState. If Pydantic validation fails (e.g., invalid
+        # enum values or incorrect types) treat the file as corrupted: move it
+        # to backups and return defaults. This ensures graceful fallback for
+        # both YAML parse errors and model validation failures.
+        try:
+            config = UserConfiguration(**data)
+        except (ValueError, TypeError) as _err:
+            return self._backup_and_return_defaults()
+
         return ConfigurationState(config=config, credentials=creds)
+
+    def _backup_and_return_defaults(
+        self, suffix: str | None = None
+    ) -> ConfigurationState:
+        """Backup the current config file to the backup dir and return defaults.
+
+        If suffix is provided it will be appended to the backup filename.
+        """
+        try:
+            import time
+
+            ts = time.strftime("%Y%m%d-%H%M%S")
+            bak_name = f"config.yaml.corrupted.{ts}"
+            if suffix:
+                bak_name = bak_name + suffix
+            bak_path = self.paths.backup_dir / bak_name
+            self.paths.backup_dir.mkdir(parents=True, exist_ok=True)
+            # Robust byte-copy to avoid platform-specific shutil edge cases
+            with open(self.paths.config_file, "rb") as src, open(
+                bak_path, "wb"
+            ) as dst:
+                dst.write(src.read())
+
+            # Record metadata and log the event
+            self.last_backup_path = bak_path
+            self.last_backup_reason = suffix or "corrupted_yaml"
+            with contextlib.suppress(Exception):
+                self.logger.warning(
+                    "Backed up corrupted configuration",
+                    extra={
+                        "backup_path": str(bak_path),
+                        "reason": self.last_backup_reason,
+                    },
+                )
+
+            # Enforce retention policy (best-effort)
+            with contextlib.suppress(Exception):
+                self._enforce_backup_retention()
+        except OSError:
+            # Best-effort: ignore backup failures but clear metadata
+            self.last_backup_path = None
+            self.last_backup_reason = None
+        return ConfigurationState()
+
+    def _enforce_backup_retention(self) -> None:
+        """Keep only the most recent BACKUP_RETENTION backup files.
+
+        This operates only on top-level files in the backup dir that match
+        the `config.yaml.corrupted` prefix. Older files beyond the retention
+        limit are removed. Best-effort: swallow filesystem errors.
+        """
+        try:
+            files = [
+                p
+                for p in self.paths.backup_dir.iterdir()
+                if p.is_file() and p.name.startswith("config.yaml.corrupted")
+            ]
+            if len(files) <= self.BACKUP_RETENTION:
+                return
+            # Sort by mtime descending (newest first)
+            files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            to_remove = files[self.BACKUP_RETENTION :]
+            for f in to_remove:
+                try:
+                    f.unlink()
+                except OSError:
+                    # best-effort
+                    continue
+        except OSError:
+            # best-effort
+            return
 
     def _parse_env_file(self) -> APICredentials:
         """Parse the .env file into an APICredentials object.

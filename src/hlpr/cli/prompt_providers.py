@@ -23,6 +23,7 @@ from typing import Any, Protocol
 
 import typer
 from rich.console import Console
+from rich.prompt import Prompt, Confirm
 
 from hlpr.cli.help_display import HelpDisplay
 from hlpr.cli.prompts import OptionPrompts
@@ -182,7 +183,7 @@ class RichTyperPromptProvider:
             self.defaults.get("max_attempts", self._prompts.max_attempts)
         )
         for _ in range(max_attempts):
-            candidate = typer.prompt("Provider", default=default)
+            candidate = Prompt.ask("Provider", default=default)
             valid, msg = self._prompts.validate_provider(candidate)
             if valid:
                 return candidate
@@ -199,7 +200,7 @@ class RichTyperPromptProvider:
             self.defaults.get("max_attempts", self._prompts.max_attempts)
         )
         for _ in range(max_attempts):
-            candidate = typer.prompt("Output format", default=default)
+            candidate = Prompt.ask("Output format", default=default)
             valid, msg = self._prompts.validate_format(candidate)
             if valid:
                 return candidate
@@ -211,12 +212,12 @@ class RichTyperPromptProvider:
         return default
 
     def save_file_prompt(self) -> tuple[bool, str | None]:
-        save = typer.confirm(
+        save = Confirm.ask(
             "Save output to file?", default=bool(self.defaults.get("save", False))
         )
         path = None
         if save:
-            path = typer.prompt(
+            path = Prompt.ask(
                 "Output path",
                 default=str(self.defaults.get("output_path", "output.txt")),
             )
@@ -228,7 +229,7 @@ class RichTyperPromptProvider:
             self.defaults.get("max_attempts", self._prompts.max_attempts)
         )
         for _ in range(max_attempts):
-            raw = typer.prompt("Temperature", default=str(default))
+            raw = Prompt.ask("Temperature", default=str(default))
             valid, msg = self._prompts.validate_temperature(raw)
             if valid:
                 try:
@@ -247,7 +248,7 @@ class RichTyperPromptProvider:
             self.defaults.get("max_attempts", self._prompts.max_attempts)
         )
         for _ in range(max_attempts):
-            chunk = typer.prompt("Chunk size", default=str(default))
+            chunk = Prompt.ask("Chunk size", default=str(default))
             try:
                 val = int(chunk)
                 if val <= 0:

@@ -1063,7 +1063,9 @@ def summarize_guided(
                     style="yellow",
                     border_style="yellow",
                 )
-                if not typer.confirm("Continue with processing?", default=True):
+                from rich.prompt import Confirm
+
+                if not Confirm.ask("Continue with processing?", default=True):
                     display.show_panel(
                         "Cancelled",
                         "Operation cancelled by user.",
@@ -1130,11 +1132,15 @@ def summarize_guided(
                         # Only save when running in a TTY (avoid overwriting in CI)
                         import sys as _sys
 
-                        if _sys.stdin.isatty() and typer.confirm(
-                            "Save these preferences for future runs?", default=True
-                        ):
+                        if _sys.stdin.isatty():
+                            from rich.prompt import Confirm as _Confirm
+
                             try:
-                                mgr.save_configuration(st)
+                                if _Confirm.ask(
+                                    "Save these preferences for future runs?",
+                                    default=True,
+                                ):
+                                    mgr.save_configuration(st)
                             except Exception:
                                 logger.warning(
                                     "Failed to persist configuration preferences"

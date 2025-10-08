@@ -5,6 +5,7 @@ from typing import NoReturn
 
 import typer
 from rich.console import Console
+from rich.prompt import Prompt, Confirm
 
 from hlpr.config.manager import ConfigurationManager
 from hlpr.config.models import (
@@ -19,6 +20,27 @@ from hlpr.models.user_preferences import PreferencesStore, UserPreferences
 
 app = typer.Typer(help="Configuration commands")
 console = Console()
+
+
+def _warn_if_backup(mgr: ConfigurationManager) -> None:
+    """Print a concise warning if the manager recorded a backup during load.
+
+    This is a small UX improvement so users notice when their config was
+    preserved and defaults are in use.
+    """
+    try:
+        if getattr(mgr, "last_backup_path", None):
+            # Use stderr so we don't pollute stdout (important when callers
+            # expect machine-readable output, e.g., JSON).
+            from rich.console import Console as _Console
+
+            _err_console = _Console(stderr=True)
+            _err_console.print(
+                f"[yellow]Warning:[/yellow] configuration was backed up to {mgr.last_backup_path} ({mgr.last_backup_reason or 'corrupt'}) and defaults are in use."
+            )
+    except Exception:
+        # best-effort, don't raise in CLI
+        pass
 
 
 def _simulated_prompts() -> list[str]:
@@ -99,14 +121,14 @@ def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
     if sim is not None:
         val = sim or default
     else:
-        val = typer.prompt(f"{prompt} [{default}]") or default
+        val = Prompt.ask(prompt, choices=choices, default=default)
     while val not in choices:
         console.print(f"Invalid choice: {val}")
         sim = _next_simulated_response()
         if sim is not None:
             val = sim or default
         else:
-            val = typer.prompt(f"{prompt} [{default}]") or default
+            val = Prompt.ask(prompt, choices=choices, default=default)
     return val
 
 
@@ -114,6 +136,9 @@ def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
 def setup_config(
     non_interactive: bool = typer.Option(
         False, "--non-interactive", help="Run setup without interactive prompts"
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Run setup even if configuration already exists"
     ),
 ) -> None:
     """Run guided setup for configuration.
@@ -124,10 +149,42 @@ def setup_config(
     paths = ConfigurationPaths.default()
     mgr = ConfigurationManager(paths=paths)
 
-    if mgr.is_first_run():
+    is_first = mgr.is_first_run()
+
+    # Decide whether to run setup: if first-run or --force or non_interactive we
+    # run automatically; otherwise prompt the user.
+    should_run = False
+    if is_first or force or non_interactive:
+        should_run = True
+    else:
+        # Support simulated responses for tests via HLPR_SIMULATED_PROMPTS
+        sim = _next_simulated_response()
+        if sim is not None:
+            proceed = sim.lower() in ("y", "yes", "true", "1")
+        else:
+            proceed = Confirm.ask("Configuration already exists. Run guided setup anyway?", default=False)
+        if not proceed:
+            console.print(
+                "Configuration already exists. Use 'hlpr config reset' to reset or 'hlpr config show' to view."
+            )
+            raise typer.Exit(0)
+        should_run = True
+
+    if should_run:
         if non_interactive:
             state = mgr.load_configuration()
+            _warn_if_backup(mgr)
             mgr.save_configuration(state)
+            # Initialize guided-mode config defaults as well
+            try:
+                from hlpr.cli import config_commands
+
+                # Use the module-level function to create/reset guided config
+                # without creating a backup (non-interactive init)
+                config_commands.reset(backup=False)
+            except Exception:
+                # best-effort: guided config initialization should not fail setup
+                pass
             console.print(f"Configuration initialized at {paths.config_dir}")
             raise typer.Exit(0)
 
@@ -150,18 +207,31 @@ def setup_config(
 
         # Temperature
         temp_default = 0.3
-        sim = _next_simulated_response()
-        if sim is not None:
-            temp_raw = sim or str(temp_default)
-        else:
-            temp_raw = typer.prompt(f"Default temperature [{temp_default}]") or str(
-                temp_default
-            )
-        try:
-            temperature = float(temp_raw)
-        except Exception:
-            console.print("Invalid temperature; using default 0.3")
-            temperature = temp_default
+        # Temperature: validate numeric input and enforce range [0.0, 1.0]
+        temperature = temp_default
+        while True:
+            sim = _next_simulated_response()
+            if sim is not None:
+                temp_raw = sim or str(temp_default)
+            else:
+                temp_raw = Prompt.ask(
+                    "Default temperature (0.0 - 1.0)", default=str(temp_default)
+                )
+            try:
+                val = float(temp_raw)
+            except Exception:
+                console.print(
+                    f"Invalid temperature '{temp_raw}'; enter a number between 0.0 and 1.0"
+                )
+                # reprompt
+                continue
+            if not (0.0 <= val <= 1.0):
+                console.print(
+                    f"Temperature {val} out of range; please enter a value between 0.0 and 1.0"
+                )
+                continue
+            temperature = val
+            break
 
         # Max tokens
         max_default = 8192
@@ -169,9 +239,7 @@ def setup_config(
         if sim is not None:
             max_raw = sim or str(max_default)
         else:
-            max_raw = typer.prompt(f"Default max tokens [{max_default}]") or str(
-                max_default
-            )
+            max_raw = Prompt.ask("Default max tokens", default=str(max_default))
         try:
             max_tokens = int(max_raw)
         except Exception:
@@ -182,13 +250,13 @@ def setup_config(
         # Prompt for API key when provider is not local
         if provider != ProviderType.LOCAL:
             key_prompt = f"Enter API key for {provider.value} (leave blank to skip)"
-            # Check for simulated value first
+            # Check for simulated value first (tests)
             sim = _next_simulated_response()
             if sim is not None:
                 api_key = sim
             else:
                 # hide input when available
-                api_key = typer.prompt(key_prompt, hide_input=True)
+                api_key = Prompt.ask(key_prompt, password=True)
             if api_key:
                 # Set the appropriate field on APICredentials
                 if provider == ProviderType.OPENAI:
@@ -219,6 +287,16 @@ def setup_config(
 
         state = ConfigurationState(config=config, credentials=creds)
         mgr.save_configuration(state)
+        # Also initialize guided-mode configuration with defaults and create a
+        # backup of any existing guided config so users have a sane guided
+        # workflow out of the box.
+        try:
+            from hlpr.cli import config_commands
+
+            config_commands.reset(backup=True)
+        except Exception:
+            # best-effort
+            pass
         console.print(f"Configuration initialized and saved to {paths.config_file}")
         raise typer.Exit(0)
 
@@ -234,7 +312,10 @@ def validate_config() -> None:
     """Validate current configuration files."""
     paths = ConfigurationPaths.default()
     mgr = ConfigurationManager(paths=paths)
+    # validate_configuration will call load_configuration internally when
+    # no state is provided; warn if load resulted in a backup.
     result = mgr.validate_configuration()
+    _warn_if_backup(mgr)
     if result.is_valid:
         console.print("Configuration is valid")
         raise typer.Exit(0)
@@ -243,21 +324,47 @@ def validate_config() -> None:
 
 
 @app.command("reset")
-def reset_config(backup: bool = typer.Option(True, "--backup/--no-backup")) -> None:
+def reset_config(
+    backup: bool = typer.Option(True, "--backup/--no-backup"),
+    yes: bool = typer.Option(False, "--yes", help="Skip confirmation"),
+) -> None:
+    """Reset configuration to defaults.
+
+    By default this prompts for confirmation and creates a manual backup. Use
+    `--no-backup` to skip creating a backup, or `--yes` to skip confirmation.
+    """
     paths = ConfigurationPaths.default()
     mgr = ConfigurationManager(paths=paths)
+
+    if not yes:
+        sim = _next_simulated_response()
+        if sim is not None:
+            confirm = sim.lower() in ("y", "yes", "true", "1")
+        else:
+            confirm = Confirm.ask(
+                "This will back up your current configuration and reset to defaults. Continue?",
+                default=False,
+            )
+        if not confirm:
+            console.print("Aborted")
+            raise typer.Exit(0)
+
     if backup:
         b = mgr.backup_config()
         if b:
             console.print(f"Backed up configuration to: {b}")
-    # Remove files
+
+    # Write default configuration (safer: keep a known-good state)
+    from hlpr.config.models import ConfigurationState
+
     try:
-        if paths.config_file.exists():
-            paths.config_file.unlink()
-        if paths.env_file.exists():
-            paths.env_file.unlink()
+        default_state = ConfigurationState()
+        mgr.save_configuration(default_state)
         console.print("Configuration reset to defaults")
         raise typer.Exit(0)
+    except typer.Exit:
+        # Propagate Typer/CLI exit requests unchanged
+        raise
     except Exception as exc:
         console.print(f"Failed to reset configuration: {exc}")
         raise typer.Exit(1) from exc
@@ -272,6 +379,9 @@ def show_config(
     paths = ConfigurationPaths.default()
     mgr = ConfigurationManager(paths=paths)
     state = mgr.load_configuration()
+    # Avoid printing warnings to stdout when caller requested JSON output.
+    if output_format != "json":
+        _warn_if_backup(mgr)
     cfg = state.config
     creds = state.credentials
     if output_format == "json":
@@ -297,17 +407,111 @@ def show_config(
         console.print("credentials: ****")
     else:
         console.print("credentials: present")
+# Guided-mode commands are initialized as part of `config setup` so we do not
+# mount a separate `config guided` subcommand here. See `src/hlpr/cli/config_commands.py`.
+
+
+# Backups sub-app
+backups_app = typer.Typer(name="backups", help="Manage configuration backups")
+
+
+@backups_app.command("list")
+def list_backups() -> None:
+    """List available backups (corrupted flat backups and manual timestamped backups)."""
+    paths = ConfigurationPaths.default()
+    bdir = paths.backup_dir
+    if not bdir.exists():
+        console.print("No backups found")
+        raise typer.Exit(0)
+
+    # List flat corrupted backups first
+    corrupted = sorted(
+        [p for p in bdir.iterdir() if p.is_file() and p.name.startswith("config.yaml.corrupted")],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if corrupted:
+        console.print("Corrupted backups:")
+        for p in corrupted:
+            console.print(f"- {p.name} ({p.stat().st_mtime})")
+
+    # Then list manual timestamped backup subdirs
+    subdirs = sorted(
+        [p for p in bdir.iterdir() if p.is_dir()],
+        key=lambda p: p.name,
+        reverse=True,
+    )
+    if subdirs:
+        console.print("Manual backups:")
+        for d in subdirs:
+            console.print(f"- {d.name}")
+
     raise typer.Exit(0)
 
 
-# Mount guided-mode config commands (lazy import to avoid heavy imports at module load)
-try:
-    from hlpr.cli import config_commands as _config_commands_module
+@backups_app.command("restore")
+def restore_backup(name: str) -> None:
+    """Restore a named backup. For corrupted flat backups pass the filename, for manual backups pass the subdir name."""
+    paths = ConfigurationPaths.default()
+    mgr = ConfigurationManager(paths=paths)
+    bdir = paths.backup_dir
+    target = bdir / name
+    # If name corresponds to a flat file, attempt to restore
+    if target.is_file():
+        # Move backed up file into place
+        try:
+            mgr.paths.config_dir.mkdir(parents=True, exist_ok=True)
+            target_path = mgr.paths.config_file
+            # copy the file from backup to config path
+            import shutil
 
-    app.add_typer(_config_commands_module.app, name="guided")
-except Exception:
-    # If import fails (e.g., in some tests or trimmed environments), skip wiring.
-    pass
+            shutil.copy2(target, target_path)
+            console.print(f"Restored {name} to {target_path}")
+            raise typer.Exit(0)
+        except Exception as exc:
+            console.print(f"Failed to restore backup: {exc}")
+            raise typer.Exit(1) from exc
+
+    # If it's a subdir
+    sub = bdir / name
+    if sub.is_dir():
+        ok = mgr.restore_backup(sub)
+        if ok:
+            console.print(f"Restored backup from {sub}")
+            raise typer.Exit(0)
+        console.print(f"Failed to restore from {sub}")
+        raise typer.Exit(1)
+
+    console.print("Backup not found")
+    raise typer.Exit(2)
+
+
+@backups_app.command("delete")
+def delete_backup(name: str) -> None:
+    """Delete a named backup (file or subdir)."""
+    paths = ConfigurationPaths.default()
+    bdir = paths.backup_dir
+    target = bdir / name
+    try:
+        if target.is_file():
+            target.unlink()
+            console.print(f"Deleted {name}")
+            raise typer.Exit(0)
+        if target.is_dir():
+            import shutil
+
+            shutil.rmtree(target)
+            console.print(f"Deleted {name}")
+            raise typer.Exit(0)
+    except Exception as exc:
+        console.print(f"Failed to delete backup: {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print("Backup not found")
+    raise typer.Exit(2)
+
+
+app.add_typer(backups_app, name="backups")
 
 
 @app.command("set")
@@ -391,6 +595,7 @@ def edit_config(
         # Create default config first
         mgr = ConfigurationManager(paths=paths)
         mgr.save_configuration(mgr.load_configuration())
+        _warn_if_backup(mgr)
 
     cmd = editor or os.environ.get("EDITOR")
     if not cmd:

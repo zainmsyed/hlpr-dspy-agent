@@ -44,7 +44,7 @@ Single project structure - paths from repository root:
 -## Phase 3.1: Setup
 - [x] T001 Add PyYAML dependency to project: `uv add pyyaml`
  - [x] T002 Create configuration module structure in `src/hlpr/config/`
-- [ ] T003 [P] Configure ruff linting rules for new config module
+ - [x] T003 [P] Configure ruff linting rules for new config module
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
@@ -111,13 +111,13 @@ Single project structure - paths from repository root:
 - [x] T044 [P] Unit tests for UserConfiguration model validation in `tests/unit/test_user_configuration.py`
 - [x] T045 [P] Unit tests for APICredentials model in `tests/unit/test_api_credentials.py`
 - [x] T046 [P] Unit tests for ConfigurationManager methods in `tests/unit/test_configuration_manager.py`
-- [ ] T047 [P] Unit tests for configuration validation logic in `tests/unit/test_config_validation.py`
-- [ ] T048 [P] Unit tests for file operations and error handling in `tests/unit/test_config_file_ops.py`
+ - [x] T047 [P] Unit tests for configuration validation logic in `tests/unit/test_config_validation.py`
+ - [x] T048 [P] Unit tests for file operations and error handling in `tests/unit/test_config_file_ops.py`
 
 ### Performance and Security
 - [ ] T049 [P] Performance tests for <100ms loading requirement in `tests/performance/test_config_performance.py`
 - [ ] T050 [P] Security tests for file permissions and API key handling in `tests/integration/test_config_security.py`
-- [ ] T051 [P] File size validation for 1MB limit in configuration manager
+ - [x] T051 [P] File size validation for 1MB limit in configuration manager
  - [x] T052 File permission enforcement for .env files (chmod 600)
 - [ ] T053 Memory usage optimization for configuration caching
 
@@ -210,3 +210,5 @@ Task: "Unit tests for ConfigurationManager in tests/unit/test_configuration_mana
  - Implemented template-based initial writes for `config.yaml` and `.env` and added integration tests that assert the template content is present.
  - Implemented and wired CLI commands: `config setup`, `config show`, `config reset`, `config validate`, and basic persistent `config set/get` (KV store) under `~/.hlpr/kv.json`.
  - The full test suite was executed (`PYTHONPATH=src pytest`) and completes within the time budget; all tests pass (1 skip) on the current branch.
+ - Recent: Implemented robust corrupted-config handling in `src/hlpr/config/manager.py` (treat unexpected YAML/malformed model input as corrupted, back up the original config to `backups/config.yaml.corrupted.<timestamp>`, and fall back to defaults). Updated unit tests (`T047`, `T048`) to reflect this contract. Ran `uvx ruff check` and fixed minor lint issues; full test suite (`PYTHONPATH=src pytest`) passes locally.
+ - Recent: Added a file-size guard (1MB) in `ConfigurationManager.load_configuration` that treats oversize configuration files as corrupted, backs them up with suffix `.oversize`, and falls back to defaults. Added `test_large_config_size_triggers_backup` to `tests/unit/test_config_file_ops.py` and verified unit tests pass.
